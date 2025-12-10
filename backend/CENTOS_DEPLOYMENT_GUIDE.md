@@ -379,6 +379,93 @@ Open browser: `http://your-server-hostname` or `https://your-server-hostname`
 
 ## Troubleshooting
 
+### Java Compiler Not Found Error
+
+If you get `Error: not found: javac` during npm install:
+
+```bash
+# Verify Java is installed
+java -version
+javac -version  # This should work - if not, JDK is not installed
+
+# If javac is not found, install Java Development Kit (not just JRE)
+sudo yum install -y java-21-openjdk-devel
+
+# Verify JAVA_HOME is set correctly
+echo $JAVA_HOME
+which javac
+
+# If JAVA_HOME is not set, set it now
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+export PATH=$JAVA_HOME/bin:$PATH
+
+# Verify javac is now accessible
+javac -version
+
+# Now retry npm install
+npm install
+```
+
+**Common Issues:**
+1. **Only JRE installed** - Need JDK (includes javac compiler)
+2. **JAVA_HOME not set** - Must be set before npm install
+3. **Wrong JAVA_HOME path** - Must point to JDK directory
+
+**Quick Fix:**
+```bash
+# One-liner to install JDK and set JAVA_HOME
+sudo yum install -y java-21-openjdk-devel && \
+export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac)))) && \
+export PATH=$JAVA_HOME/bin:$PATH && \
+echo "JAVA_HOME=$JAVA_HOME" && \
+npm install
+```
+
+### SSL Certificate Issues During npm install
+
+If you get `SELF_SIGNED_CERT_IN_CHAIN` errors during npm install:
+
+```bash
+# Option 1: Disable strict SSL temporarily (not recommended for production)
+npm config set strict-ssl false
+npm install
+npm config set strict-ssl true
+
+# Option 2: Set custom CA certificate
+npm config set cafile /path/to/your/ca-certificate.crt
+
+# Option 3: Use corporate proxy settings
+npm config set proxy http://proxy.company.com:8080
+npm config set https-proxy http://proxy.company.com:8080
+
+# Option 4: Install with --legacy-peer-deps if peer dependency issues
+npm install --legacy-peer-deps
+
+# Option 5: Clear npm cache and retry
+npm cache clean --force
+npm install
+```
+
+**For WSL2 environments** (which you appear to be using):
+```bash
+# WSL2 may have certificate issues - copy Windows certificates
+sudo cp /mnt/c/Windows/System32/drivers/etc/hosts /etc/hosts
+
+# Or set NODE_TLS_REJECT_UNAUTHORIZED (development only!)
+export NODE_TLS_REJECT_UNAUTHORIZED=0
+npm install
+unset NODE_TLS_REJECT_UNAUTHORIZED
+```
+
+**Best Solution for Corporate Networks:**
+```bash
+# Get your corporate CA certificate and configure npm
+sudo cp /path/to/corporate-ca.crt /etc/pki/ca-trust/source/anchors/
+sudo update-ca-trust
+npm config set cafile /etc/pki/ca-trust/source/anchors/corporate-ca.crt
+npm install
+```
+
 ### Backend Won't Start
 ```bash
 # Check logs
