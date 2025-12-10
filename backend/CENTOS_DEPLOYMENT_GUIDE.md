@@ -85,16 +85,19 @@ npm --version   # Should show 10.x.x or higher
 ### 3. Install Java (Required for JT400)
 
 ```bash
-# Install OpenJDK 11
-sudo yum install -y java-11-openjdk java-11-openjdk-devel
+# Install OpenJDK 21 LTS (Recommended)
+sudo yum install -y java-21-openjdk java-21-openjdk-devel
+
+# Alternative: If Java 21 is not available in your repos, add EPEL or use Amazon Corretto
+# sudo yum install -y https://corretto.aws/downloads/latest/amazon-corretto-21-x64-linux-jdk.rpm
 
 # Set JAVA_HOME
-echo 'export JAVA_HOME=/usr/lib/jvm/java-11-openjdk' | sudo tee -a /etc/profile.d/java.sh
+echo 'export JAVA_HOME=/usr/lib/jvm/java-21-openjdk' | sudo tee -a /etc/profile.d/java.sh
 echo 'export PATH=$JAVA_HOME/bin:$PATH' | sudo tee -a /etc/profile.d/java.sh
 source /etc/profile.d/java.sh
 
 # Verify Java installation
-java -version
+java -version  # Should show openjdk version "21.x.x"
 echo $JAVA_HOME
 ```
 
@@ -127,7 +130,7 @@ cd ibmi_query_runner/backend
 
 ```bash
 # Ensure JAVA_HOME is set
-export JAVA_HOME=/usr/lib/jvm/java-11-openjdk
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 export PATH=$JAVA_HOME/bin:$PATH
 
 # Install dependencies
@@ -297,8 +300,8 @@ Type=simple
 User=ibmiapp
 WorkingDirectory=/home/ibmiapp/ibmi_query_runner/backend
 Environment="NODE_ENV=production"
-Environment="JAVA_HOME=/usr/lib/jvm/java-11-openjdk"
-Environment="PATH=/usr/lib/jvm/java-11-openjdk/bin:/usr/bin:/bin"
+Environment="JAVA_HOME=/usr/lib/jvm/java-21-openjdk"
+Environment="PATH=/usr/lib/jvm/java-21-openjdk/bin:/usr/bin:/bin"
 ExecStart=/usr/bin/npm start
 Restart=on-failure
 RestartSec=10
