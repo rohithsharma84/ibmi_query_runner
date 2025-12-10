@@ -116,7 +116,6 @@ async function rollback(connection) {
     console.error('Rollback error:', error);
   }
 }
-}
 
 /**
  * Test database connection
