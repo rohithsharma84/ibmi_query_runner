@@ -5,14 +5,17 @@ This document outlines the package upgrades made to fix npm deprecation warnings
 
 ## Major Changes
 
-### 1. node-jt400: 2.2.0 → 3.0.0
-**Status**: ✅ Compatible
-- Updated to version 3.0.0 to avoid native compilation issues with Python 3.6
-- Version 6.0.1 requires Python 3.8+ for node-gyp (Java native bindings)
-- Version 3.0.0 provides significant improvements over 2.2.0 without requiring newer Python
-- The API usage in `src/config/database.js` is compatible with version 3.0.0
+### 1. node-jt400: Set to 2.0.2
+**Status**: ✅ Using Available Version
+- **Reason**: Version 2.0.2 is available on your system
+- ALL versions of node-jt400 (including 2.2.0+) require the `java` package which needs native compilation
+- Native compilation requires Python 3.8+ (your system has Python 3.6.15)
+- Using exact version 2.0.2 (without caret ^) to ensure consistency
+- The API usage in `src/config/database.js` is compatible with version 2.0.2
 - Uses standard methods: `pool()`, `connect()`, `execute()`, `close()`
-- No breaking changes detected in the codebase
+- **Future Upgrade Path**: To use newer versions of node-jt400:
+  - Upgrade Python to 3.8+ on your IBM i system
+  - Then you can upgrade to node-jt400 v6.0.1 or later
 
 ### 2. ESLint: 8.55.0 → 9.17.0
 **Status**: ✅ Migrated to Flat Config
@@ -100,5 +103,5 @@ npm install
 
 - **Node.js Version**: The application requires Node.js >= 16.0.0 (unchanged)
 - **ESLint Plugins**: If you need additional ESLint plugins in the future, ensure they support ESLint 9.x flat config format
-- **node-jt400**: Version 3.0.0 includes performance improvements and bug fixes over 2.2.0 without requiring Python 3.8+ for native compilation
-- **Python Compatibility**: If you upgrade Python to 3.8+ in the future, you can consider upgrading to node-jt400 v6.0.1 for additional features
+- **node-jt400**: Using version 2.0.2 which is available on your system and doesn't require Python 3.8+
+- **Python Compatibility**: If you upgrade Python to 3.8+ in the future, you can upgrade to node-jt400 v6.0.1 for additional features and improvements
