@@ -69,13 +69,17 @@ sudo yum install -y git curl wget openssl
 ### 2. Install Node.js
 
 ```bash
-# Install Node.js 18.x (LTS)
-curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+# Install Node.js 22.x (Current LTS - Recommended)
+curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
 sudo yum install -y nodejs
 
+# Alternative: Install Node.js 20.x (Previous LTS - Still supported until 2026)
+# curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+# sudo yum install -y nodejs
+
 # Verify installation
-node --version  # Should show v18.x.x
-npm --version   # Should show 9.x.x or higher
+node --version  # Should show v22.x.x (or v20.x.x)
+npm --version   # Should show 10.x.x or higher
 ```
 
 ### 3. Install Java (Required for JT400)
