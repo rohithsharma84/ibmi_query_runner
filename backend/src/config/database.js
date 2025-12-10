@@ -62,12 +62,12 @@ async function query(sql, params = []) {
       });
     }
 
-    const sql = new iSql();
-    sql.addQuery(finalSql);
-    sql.fetch();
-    sql.free();
+    const sqlStatement = new iSql();
+    sqlStatement.addQuery(finalSql);
+    sqlStatement.fetch();
+    sqlStatement.free();
     
-    connection.add(sql);
+    connection.add(sqlStatement);
     
     // Execute SQL using iSql
     connection.run((error, xmlOutput) => {
