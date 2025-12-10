@@ -5,9 +5,12 @@ This document outlines the package upgrades made to fix npm deprecation warnings
 
 ## Major Changes
 
-### 1. node-jt400: 2.2.0 → 6.0.1
+### 1. node-jt400: 2.2.0 → 3.0.0
 **Status**: ✅ Compatible
-- The API usage in `src/config/database.js` is compatible with version 6.0.1
+- Updated to version 3.0.0 to avoid native compilation issues with Python 3.6
+- Version 6.0.1 requires Python 3.8+ for node-gyp (Java native bindings)
+- Version 3.0.0 provides significant improvements over 2.2.0 without requiring newer Python
+- The API usage in `src/config/database.js` is compatible with version 3.0.0
 - Uses standard methods: `pool()`, `connect()`, `execute()`, `close()`
 - No breaking changes detected in the codebase
 
@@ -97,4 +100,5 @@ npm install
 
 - **Node.js Version**: The application requires Node.js >= 16.0.0 (unchanged)
 - **ESLint Plugins**: If you need additional ESLint plugins in the future, ensure they support ESLint 9.x flat config format
-- **node-jt400**: Version 6.0.1 includes performance improvements and bug fixes over 2.2.0
+- **node-jt400**: Version 3.0.0 includes performance improvements and bug fixes over 2.2.0 without requiring Python 3.8+ for native compilation
+- **Python Compatibility**: If you upgrade Python to 3.8+ in the future, you can consider upgrading to node-jt400 v6.0.1 for additional features
