@@ -23,7 +23,8 @@ echo "Python version:"
 python3 --version
 
 # The java package reads JAVA_HOME environment variable during installation
-# No npm config needed - just ensure JAVA_HOME is exported
+echo ""
+echo "JAVA_HOME is set and will be used by npm during installation"
 
 # Clean any previous failed installations
 echo ""
@@ -32,7 +33,7 @@ rm -rf node_modules package-lock.json
 
 # Run npm install
 echo ""
-echo "Running npm install..."
+echo "Running npm install with JAVA_HOME=$JAVA_HOME..."
 npm install
 
 # Check if installation was successful
