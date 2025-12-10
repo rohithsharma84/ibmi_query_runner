@@ -3,17 +3,13 @@
  * Handles user authentication with IBM i user profiles
  */
 
-const { Connection, iSql } = require('itoolkit');
-const { parseString } = require('xml2js');
-const { promisify } = require('util');
+const jt400 = require('node-jt400');
 const { ApiError } = require('../middleware/errorHandler');
 const { HTTP_STATUS, ERROR_CODES } = require('../config/constants');
 const { generateToken } = require('../middleware/auth');
 const User = require('../models/User');
 const logger = require('../utils/logger');
 const dbConfig = require('../config/database').config;
-
-const parseXML = promisify(parseString);
 
 /**
  * Authenticate user with IBM i credentials
@@ -40,34 +36,17 @@ async function login(userId, password) {
     let authenticated = false;
     try {
       // Create a test connection with user credentials
-      const transportOptions = {
+      const testPool = jt400.pool({
         host: dbConfig.host,
-        username: userIdUpper,
+        user: userIdUpper,
         password: password,
-        port: dbConfig.port,
-      };
-
-      const connection = new Connection({
-        transport: 'ssh',
-        transportOptions,
       });
-
+      
+      const connection = await testPool.connect();
+      
       // Test the connection with a simple query
-      await new Promise((resolve, reject) => {
-        const sql = new iSql();
-        sql.addQuery('SELECT 1 FROM SYSIBM.SYSDUMMY1');
-        sql.fetch();
-        sql.free();
-        
-        connection.add(sql);
-        
-        connection.run((error, xmlOutput) => {
-          if (error) {
-            return reject(error);
-          }
-          resolve(xmlOutput);
-        });
-      });
+      await connection.execute('SELECT 1 FROM SYSIBM.SYSDUMMY1');
+      await connection.close();
       
       authenticated = true;
       logger.info('IBM i authentication successful:', { userId: userIdUpper });

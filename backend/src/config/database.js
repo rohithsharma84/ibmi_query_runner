@@ -1,14 +1,10 @@
 /**
  * Database Configuration
- * Manages connection to Db2 for i using itoolkit
+ * Manages connection to Db2 for i using JDBC (node-jt400)
  */
 
 require('dotenv').config();
-const { Connection, CommandCall, iSql } = require('itoolkit');
-const { parseString } = require('xml2js');
-const { promisify } = require('util');
-
-const parseXML = promisify(parseString);
+const jt400 = require('node-jt400');
 
 const config = {
   host: process.env.DB_HOST,
@@ -19,25 +15,19 @@ const config = {
   secure: process.env.DB_SECURE === 'true',
 };
 
-/**
- * Create a connection to IBM i
- * @returns {Connection} itoolkit Connection object
- */
-function createConnection() {
-  const transportOptions = {
-    host: config.host,
-    username: config.user,
-    password: config.password,
-    port: config.port,
-  };
+// Create connection pool
+const pool = jt400.pool({
+  host: config.host,
+  user: config.user,
+  password: config.password,
+});
 
-  // Use SSH transport for secure connections
-  const transport = config.secure ? 'ssh' : 'ssh';
-  
-  return new Connection({
-    transport,
-    transportOptions,
-  });
+/**
+ * Get a connection from the pool
+ * @returns {Promise<Object>} Database connection
+ */
+async function getConnection() {
+  return pool.connect();
 }
 
 /**
@@ -47,9 +37,8 @@ function createConnection() {
  * @returns {Promise<Array>} Query results
  */
 async function query(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    const connection = createConnection();
-    
+  let connection;
+  try {
     // Replace YOURLIB placeholder with actual library
     let finalSql = sql.replace(/YOURLIB\./g, `${config.library}.`);
     
@@ -57,104 +46,48 @@ async function query(sql, params = []) {
     if (params && params.length > 0) {
       params.forEach((param, index) => {
         const placeholder = `$${index + 1}`;
-        const value = typeof param === 'string' ? `'${param}'` : param;
+        const value = typeof param === 'string' ? `'${param.replace(/'/g, "''")}'` : param;
         finalSql = finalSql.replace(placeholder, value);
       });
     }
 
-    const sqlStatement = new iSql();
-    sqlStatement.addQuery(finalSql);
-    sqlStatement.fetch();
-    sqlStatement.free();
+    connection = await getConnection();
+    const result = await connection.execute(finalSql);
     
-    connection.add(sqlStatement);
-    
-    // Execute SQL using iSql
-    connection.run((error, xmlOutput) => {
-      if (error) {
-        console.error('Database query error:', error);
-        return reject(new Error(`Failed to execute query: ${error.message}`));
-      }
-      
-      const result = xmlOutput;
-      
-      try {
-        // Parse XML result
-        parseXML(result, (parseError, parsed) => {
-          if (parseError) {
-            return reject(new Error(`Failed to parse query result: ${parseError.message}`));
-          }
-          
-          // Extract rows from parsed XML
-          const rows = extractRows(parsed);
-          resolve(rows);
-        });
-      } catch (err) {
-        reject(new Error(`Error processing query result: ${err.message}`));
-      }
-    });
-  });
-}
-
-/**
- * Extract rows from parsed XML result
- * @param {Object} parsed - Parsed XML object
- * @returns {Array} Array of row objects
- */
-function extractRows(parsed) {
-  try {
-    if (!parsed || !parsed.myscript || !parsed.myscript.sql) {
-      return [];
-    }
-
-    const sqlResult = parsed.myscript.sql[0];
-    
-    if (!sqlResult.row) {
-      return [];
-    }
-
-    const rows = Array.isArray(sqlResult.row) ? sqlResult.row : [sqlResult.row];
-    
-    return rows.map(row => {
-      const rowData = {};
-      if (row.data) {
-        row.data.forEach(field => {
-          const fieldName = field.$.desc || field.$.name;
-          const fieldValue = field._ || null;
-          rowData[fieldName] = fieldValue;
-        });
-      }
-      return rowData;
-    });
+    return result;
   } catch (error) {
-    console.error('Error extracting rows:', error);
-    return [];
+    console.error('Database query error:', error);
+    throw new Error(`Failed to execute query: ${error.message}`);
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (closeError) {
+        console.error('Error closing connection:', closeError);
+      }
+    }
   }
 }
 
 /**
  * Execute a SQL query with a specific connection (for transactions)
- * Note: itoolkit handles connections differently, this is a wrapper for compatibility
- * @param {Object} connection - Not used with itoolkit, kept for API compatibility
+ * @param {Object} connection - Database connection
  * @param {string} sql - SQL query to execute
  * @param {Array} params - Query parameters
  * @returns {Promise<Array>} Query results
  */
 async function queryWithConnection(connection, sql, params = []) {
-  // For itoolkit, we just execute the query normally
-  // Transactions are handled differently in IBM i
-  return query(sql, params);
+  return connection.execute(sql, params);
 }
 
 /**
  * Begin a transaction
- * Note: IBM i handles transactions at the job level
- * @returns {Promise<Object>} Connection object (for API compatibility)
+ * @returns {Promise<Object>} Connection object
  */
 async function beginTransaction() {
-  // Execute SET TRANSACTION ISOLATION LEVEL
-  await query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
-  return { transactionStarted: true };
+  const connection = await getConnection();
+  await connection.execute('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+  return connection;
 }
 
 /**
@@ -162,7 +95,13 @@ async function beginTransaction() {
  * @param {Object} connection - Connection object
  */
 async function commit(connection) {
-  await query('COMMIT');
+  try {
+    await connection.execute('COMMIT');
+    await connection.close();
+  } catch (error) {
+    console.error('Commit error:', error);
+    throw error;
+  }
 }
 
 /**
@@ -171,10 +110,12 @@ async function commit(connection) {
  */
 async function rollback(connection) {
   try {
-    await query('ROLLBACK');
+    await connection.execute('ROLLBACK');
+    await connection.close();
   } catch (error) {
     console.error('Rollback error:', error);
   }
+}
 }
 
 /**
@@ -199,24 +140,6 @@ async function testConnection() {
 function getTableName(tableName) {
   return `${config.library}.${tableName}`;
 }
-
-/**
- * Get a database connection from the pool
- * Note: itoolkit doesn't use connection pooling in the same way
- * This is kept for API compatibility
- * @returns {Promise<Object>} Connection object
- */
-async function getConnection() {
-  return { 
-    execute: query,
-    close: async () => { /* itoolkit handles connection cleanup */ }
-  };
-}
-
-// Export a pool object for API compatibility
-const pool = {
-  connect: getConnection,
-};
 
 module.exports = {
   config,
