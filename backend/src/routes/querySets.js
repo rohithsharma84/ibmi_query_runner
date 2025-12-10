@@ -1,36 +1,61 @@
 /**
  * Query Set Routes
+ * Routes for managing query sets
  */
 
 const express = require('express');
 const router = express.Router();
+const querySetController = require('../controllers/querySetController');
 const { authenticate } = require('../middleware/auth');
-const { asyncHandler } = require('../middleware/errorHandler');
 
+// All query set routes require authentication
 router.use(authenticate);
 
-router.get('/', asyncHandler(async (req, res) => {
-  res.status(501).json({ success: false, message: 'Not yet implemented' });
-}));
+/**
+ * POST /api/query-sets/from-plan-cache
+ * Create a new query set from plan cache
+ * Body: { setName, description, userProfile, planCacheFilters }
+ */
+router.post('/from-plan-cache', querySetController.createFromPlanCache);
 
-router.get('/:id', asyncHandler(async (req, res) => {
-  res.status(501).json({ success: false, message: 'Not yet implemented' });
-}));
+/**
+ * POST /api/query-sets/manual
+ * Create a new query set with manual queries
+ * Body: { setName, description, userProfile, queries }
+ */
+router.post('/manual', querySetController.createManual);
 
-router.post('/', asyncHandler(async (req, res) => {
-  res.status(501).json({ success: false, message: 'Not yet implemented' });
-}));
+/**
+ * GET /api/query-sets
+ * Get all query sets
+ * Query params: userProfile, createdBy
+ */
+router.get('/', querySetController.getAll);
 
-router.put('/:id', asyncHandler(async (req, res) => {
-  res.status(501).json({ success: false, message: 'Not yet implemented' });
-}));
+/**
+ * GET /api/query-sets/:setId
+ * Get a specific query set with all its queries
+ */
+router.get('/:setId', querySetController.getById);
 
-router.delete('/:id', asyncHandler(async (req, res) => {
-  res.status(501).json({ success: false, message: 'Not yet implemented' });
-}));
+/**
+ * PUT /api/query-sets/:setId
+ * Update a query set
+ * Body: { setName, description }
+ */
+router.put('/:setId', querySetController.update);
 
-router.post('/:id/refresh', asyncHandler(async (req, res) => {
-  res.status(501).json({ success: false, message: 'Not yet implemented' });
-}));
+/**
+ * DELETE /api/query-sets/:setId
+ * Delete a query set (soft delete)
+ */
+router.delete('/:setId', querySetController.remove);
+
+/**
+ * POST /api/query-sets/:setId/refresh
+ * Refresh a query set from plan cache
+ * Body: { planCacheFilters }
+ */
+router.post('/:setId/refresh', querySetController.refresh);
 
 module.exports = router;

@@ -1,16 +1,34 @@
+/**
+ * Plan Cache Routes
+ * Routes for querying IBM i SQL plan cache
+ */
+
 const express = require('express');
 const router = express.Router();
+const planCacheController = require('../controllers/planCacheController');
 const { authenticate } = require('../middleware/auth');
-const { asyncHandler } = require('../middleware/errorHandler');
 
+// All plan cache routes require authentication
 router.use(authenticate);
 
-router.get('/views', asyncHandler(async (req, res) => {
-  res.status(501).json({ success: false, message: 'Not yet implemented' });
-}));
+/**
+ * GET /api/plan-cache/views
+ * Get available plan cache views
+ */
+router.get('/views', planCacheController.getViews);
 
-router.post('/preview', asyncHandler(async (req, res) => {
-  res.status(501).json({ success: false, message: 'Not yet implemented' });
-}));
+/**
+ * POST /api/plan-cache/query
+ * Query plan cache with filters
+ * Body: { view, userProfile, dateFrom, dateTo, minExecutionCount, limit }
+ */
+router.post('/query', planCacheController.queryCache);
+
+/**
+ * POST /api/plan-cache/preview
+ * Preview queries before importing to a query set
+ * Body: { view, userProfile, dateFrom, dateTo, minExecutionCount, limit }
+ */
+router.post('/preview', planCacheController.previewQueries);
 
 module.exports = router;

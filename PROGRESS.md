@@ -47,6 +47,62 @@
 
 ## Current Status
 
+### Phase 2: Authentication & Query Set Management ✅
+
+#### Authentication System (Completed)
+- ✅ User model with CRUD operations
+- ✅ IBM i user profile authentication via JDBC
+- ✅ JWT token generation and validation
+- ✅ Authorization middleware (admin/user roles)
+- ✅ Login/logout endpoints
+- ✅ Session management
+
+**Files Created:**
+- `backend/src/models/User.js` - User database operations
+- `backend/src/services/authService.js` - IBM i authentication logic
+- `backend/src/controllers/authController.js` - Auth endpoints
+- `backend/src/controllers/userController.js` - User management endpoints
+- `backend/src/routes/auth.js` - Authentication routes
+- `backend/src/routes/users.js` - User management routes
+
+#### Plan Cache Integration (Completed)
+- ✅ Query IBM i SQL plan cache views (QSYS2.PLAN_CACHE_INFO, QSYS2.PLAN_CACHE)
+- ✅ Filter by user profile, date range, execution count
+- ✅ Preview queries before importing
+- ✅ Statistics calculation for preview
+
+**Files Created:**
+- `backend/src/services/planCacheService.js` - Plan cache querying logic
+- `backend/src/controllers/planCacheController.js` - Plan cache endpoints
+- `backend/src/routes/planCache.js` - Plan cache routes
+
+#### Query Set Management (Completed)
+- ✅ Create query sets from plan cache
+- ✅ Create query sets manually
+- ✅ CRUD operations for query sets
+- ✅ Query deduplication using SHA-256 hashing
+- ✅ Refresh query sets from plan cache
+- ✅ Track added/removed queries during refresh
+- ✅ Soft delete for query sets
+
+**Files Created:**
+- `backend/src/models/QuerySet.js` - Query set database operations
+- `backend/src/services/querySetService.js` - Query set business logic
+- `backend/src/controllers/querySetController.js` - Query set endpoints
+- `backend/src/routes/querySets.js` - Query set routes
+
+#### Individual Query Management (Completed)
+- ✅ CRUD operations for individual queries
+- ✅ Add queries to existing sets
+- ✅ Update query text and sequence
+- ✅ Reorder queries within sets
+- ✅ Soft delete for queries
+
+**Files Created:**
+- `backend/src/models/Query.js` - Query database operations
+- `backend/src/controllers/queryController.js` - Query endpoints
+- `backend/src/routes/queries.js` - Query routes
+
 ### What's Working
 1. **Database Schema**: Complete and ready to deploy
 2. **Backend Foundation**: Core infrastructure is in place
@@ -54,45 +110,38 @@
 4. **Security**: JWT authentication, CORS, Helmet, rate limiting
 5. **Error Handling**: Centralized error handling with proper logging
 6. **Utilities**: Query hashing, validation, logging all implemented
+7. **Authentication**: IBM i user profile authentication with JWT tokens
+8. **User Management**: Full CRUD operations with admin controls
+9. **Plan Cache Integration**: Query and preview IBM i SQL plan cache
+10. **Query Set Management**: Create, refresh, and manage query sets
+11. **Query Operations**: Full CRUD for individual queries within sets
 
 ### What's Next
 
-#### Immediate Next Steps (Phase 2)
-1. Create route files (placeholders created, need implementation):
-   - `backend/src/routes/auth.js` - Authentication endpoints
-   - `backend/src/routes/users.js` - User management
-   - `backend/src/routes/querySets.js` - Query set management
-   - `backend/src/routes/queries.js` - Query operations
-   - `backend/src/routes/planCache.js` - Plan cache integration
-   - `backend/src/routes/testRuns.js` - Test run management
-   - `backend/src/routes/comparisons.js` - Comparison operations
-   - `backend/src/routes/config.js` - Configuration management
+#### Immediate Next Steps (Phase 3: Test Run Execution)
+1. Create test run management:
+   - `backend/src/models/TestRun.js` - Test run database operations
+   - `backend/src/services/testRunService.js` - Test run business logic
+   - `backend/src/controllers/testRunController.js` - Test run endpoints
+   - `backend/src/routes/testRuns.js` - Test run routes (placeholder exists)
 
-2. Create model files for database operations:
-   - `backend/src/models/User.js`
-   - `backend/src/models/QuerySet.js`
-   - `backend/src/models/Query.js`
-   - `backend/src/models/TestRun.js`
-   - `backend/src/models/Execution.js`
-   - `backend/src/models/Comparison.js`
-   - `backend/src/models/Config.js`
+2. Create query execution engine:
+   - `backend/src/services/executionService.js` - Query execution logic
+   - `backend/src/models/Execution.js` - Execution database operations
+   - Support for configurable iterations
+   - Real-time progress tracking
 
-3. Create service files for business logic:
-   - `backend/src/services/authService.js`
-   - `backend/src/services/querySetService.js`
-   - `backend/src/services/planCacheService.js`
-   - `backend/src/services/queryRefreshService.js`
-   - `backend/src/services/executionService.js`
-   - `backend/src/services/metricsService.js`
-   - `backend/src/services/comparisonService.js`
-   - `backend/src/services/reportService.js`
-   - `backend/src/services/websocketService.js`
+3. Create metrics collection:
+   - `backend/src/services/metricsService.js` - Metrics collection logic
+   - `backend/src/models/Metrics.js` - Metrics database operations
+   - Support for BASIC, STANDARD, COMPREHENSIVE levels
+   - Error handling and logging for failed queries
 
-4. Create controller files:
-   - `backend/src/controllers/authController.js`
-   - `backend/src/controllers/userController.js`
-   - `backend/src/controllers/querySetController.js`
-   - And others...
+4. Create comparison engine:
+   - `backend/src/services/comparisonService.js` - Comparison logic
+   - `backend/src/models/Comparison.js` - Comparison database operations
+   - Deviation detection with configurable thresholds
+   - Set-level and query-level analysis
 
 ## Installation Instructions
 
@@ -181,21 +230,25 @@ curl http://localhost:3000/health
 
 When continuing development, start with:
 
-1. **Create User Model and Authentication Service**
-   - Implement IBM i user profile authentication
-   - Create login/logout endpoints
-   - Test authentication flow
+1. **Create Test Run Management**
+   - Implement test run model and service
+   - Create test run endpoints
+   - Support for configurable iterations and metrics levels
 
-2. **Create Query Set Model and Service**
-   - Implement CRUD operations for query sets
-   - Create plan cache integration
-   - Test query import from plan cache
+2. **Create Query Execution Engine**
+   - Implement execution service
+   - Support for parallel/sequential execution
+   - Real-time progress tracking
 
-3. **Create Query Refresh Service**
-   - Implement refresh algorithm
-   - Test add/remove/update logic
+3. **Create Metrics Collection**
+   - Implement metrics service
+   - Support BASIC, STANDARD, COMPREHENSIVE levels
+   - Error handling for failed queries
 
-4. **Continue with remaining models and services**
+4. **Create Comparison Engine**
+   - Implement comparison service
+   - Deviation detection with configurable thresholds
+   - Set-level and query-level analysis
 
 ## Documentation
 
@@ -210,11 +263,22 @@ All planning documents are complete:
 ## Estimated Completion
 
 - **Phase 1 (Foundation)**: ✅ Complete
-- **Phase 2 (Query Sets)**: 🔄 Next (2-3 weeks)
-- **Phase 3 (Execution)**: ⏳ Pending (2-3 weeks)
+- **Phase 2 (Query Sets & Auth)**: ✅ Complete
+- **Phase 3 (Execution)**: 🔄 Next (2-3 weeks)
 - **Phase 4 (Comparison)**: ⏳ Pending (1-2 weeks)
 - **Phase 5-8 (Frontend)**: ⏳ Pending (4-5 weeks)
 - **Phase 9-10 (Polish & Deploy)**: ⏳ Pending (1-2 weeks)
 
 **Total Estimated Time**: 9-12 weeks from start
-**Current Progress**: ~10% complete (Foundation phase done)
+**Current Progress**: ~32% complete (11 of 34 tasks done)
+
+### Completed Features Summary
+- ✅ Database schema with 10 tables
+- ✅ Backend infrastructure (Express, JWT, logging, error handling)
+- ✅ IBM i user authentication
+- ✅ User management with admin controls
+- ✅ Plan cache integration and preview
+- ✅ Query set creation from plan cache or manual
+- ✅ Query set refresh with add/remove tracking
+- ✅ Individual query management (CRUD, reorder)
+- ✅ Query deduplication using SHA-256 hashing

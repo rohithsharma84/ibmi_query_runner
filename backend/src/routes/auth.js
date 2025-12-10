@@ -6,44 +6,63 @@
 const express = require('express');
 const router = express.Router();
 const { asyncHandler } = require('../middleware/errorHandler');
-
-// TODO: Implement authentication controller
-// const authController = require('../controllers/authController');
+const { authenticate } = require('../middleware/auth');
+const authController = require('../controllers/authController');
 
 /**
  * POST /api/auth/login
  * Authenticate user with IBM i credentials
+ * 
+ * Request body:
+ * {
+ *   "userId": "USERNAME",
+ *   "password": "password"
+ * }
+ * 
+ * Response:
+ * {
+ *   "success": true,
+ *   "token": "jwt-token",
+ *   "user": {
+ *     "userId": "USERNAME",
+ *     "userName": "Full Name",
+ *     "email": "email@example.com",
+ *     "isAdmin": false
+ *   }
+ * }
  */
-router.post('/login', asyncHandler(async (req, res) => {
-  // TODO: Implement login logic
-  res.status(501).json({
-    success: false,
-    message: 'Login endpoint not yet implemented',
-  });
-}));
+router.post('/login', asyncHandler(authController.login));
 
 /**
  * POST /api/auth/logout
  * Logout current user
+ * Requires authentication
+ * 
+ * Response:
+ * {
+ *   "success": true,
+ *   "message": "Logged out successfully"
+ * }
  */
-router.post('/logout', asyncHandler(async (req, res) => {
-  // TODO: Implement logout logic
-  res.status(501).json({
-    success: false,
-    message: 'Logout endpoint not yet implemented',
-  });
-}));
+router.post('/logout', authenticate, asyncHandler(authController.logout));
 
 /**
  * GET /api/auth/session
  * Get current session information
+ * Requires authentication
+ * 
+ * Response:
+ * {
+ *   "success": true,
+ *   "user": {
+ *     "userId": "USERNAME",
+ *     "userName": "Full Name",
+ *     "email": "email@example.com",
+ *     "isAdmin": false,
+ *     "lastLogin": "2024-01-01T00:00:00.000Z"
+ *   }
+ * }
  */
-router.get('/session', asyncHandler(async (req, res) => {
-  // TODO: Implement session check
-  res.status(501).json({
-    success: false,
-    message: 'Session endpoint not yet implemented',
-  });
-}));
+router.get('/session', authenticate, asyncHandler(authController.getSession));
 
 module.exports = router;
