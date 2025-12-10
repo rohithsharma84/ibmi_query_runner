@@ -22,10 +22,8 @@ echo ""
 echo "Python version:"
 python3 --version
 
-# Set npm config for java_home (lowercase as required by java package)
-echo ""
-echo "Setting npm java_home configuration..."
-npm config set java_home "$JAVA_HOME"
+# The java package reads JAVA_HOME environment variable during installation
+# No npm config needed - just ensure JAVA_HOME is exported
 
 # Clean any previous failed installations
 echo ""
