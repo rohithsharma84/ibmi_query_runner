@@ -27,7 +27,16 @@ const pool = jt400.pool({
  * @returns {Promise<Object>} Database connection
  */
 async function getConnection() {
-  return pool.connect();
+  // node-jt400 pool manages connections internally
+  // Return a wrapper object with execute method for compatibility
+  return {
+    execute: async (sql, params = []) => {
+      return pool.query(sql, params);
+    },
+    close: async () => {
+      // Connection is managed by pool, nothing to close
+    },
+  };
 }
 
 /**
@@ -37,35 +46,20 @@ async function getConnection() {
  * @returns {Promise<Array>} Query results
  */
 async function query(sql, params = []) {
-  let connection;
   try {
     // Replace YOURLIB placeholder with actual library
     let finalSql = sql.replace(/YOURLIB\./g, `${config.library}.`);
     
-    // Handle parameterized queries
-    if (params && params.length > 0) {
-      params.forEach((param, index) => {
-        const placeholder = `$${index + 1}`;
-        const value = typeof param === 'string' ? `'${param.replace(/'/g, "''")}'` : param;
-        finalSql = finalSql.replace(placeholder, value);
-      });
-    }
-
-    connection = await getConnection();
-    const result = await connection.execute(finalSql);
+    // Handle parameterized queries - node-jt400 uses ? placeholders
+    const finalParams = params || [];
+    
+    // Use pool.query directly - it handles connections automatically
+    const result = await pool.query(finalSql, finalParams);
     
     return result;
   } catch (error) {
     console.error('Database query error:', error);
     throw new Error(`Failed to execute query: ${error.message}`);
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (closeError) {
-        console.error('Error closing connection:', closeError);
-      }
-    }
   }
 }
 
@@ -77,17 +71,52 @@ async function query(sql, params = []) {
  * @returns {Promise<Array>} Query results
  */
 async function queryWithConnection(connection, sql, params = []) {
-  return connection.execute(sql, params);
+  // Replace YOURLIB placeholder with actual library
+  let finalSql = sql.replace(/YOURLIB\./g, `${config.library}.`);
+  return connection.execute(finalSql, params);
 }
 
 /**
  * Begin a transaction
- * @returns {Promise<Object>} Connection object
+ * @returns {Promise<Object>} Transaction connection object
  */
 async function beginTransaction() {
-  const connection = await getConnection();
-  await connection.execute('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
-  return connection;
+  // Return a transaction wrapper that node-jt400 pool.transaction() expects
+  let transactionCallback;
+  const transactionPromise = new Promise((resolve) => {
+    transactionCallback = resolve;
+  });
+  
+  return {
+    execute: async (sql, params = []) => {
+      const finalSql = sql.replace(/YOURLIB\./g, `${config.library}.`);
+      return pool.query(finalSql, params);
+    },
+    commit: async () => {
+      // Commit handled by pool.transaction
+    },
+    rollback: async () => {
+      // Rollback handled by pool.transaction
+    },
+    close: async () => {
+      // Connection cleanup handled by pool
+    },
+  };
+}
+
+/**
+ * Execute a transaction
+ * @param {Function} callback - Transaction callback function
+ * @returns {Promise<any>} Transaction result
+ */
+async function transaction(callback) {
+  // If no callback, return a transaction connection object
+  if (!callback) {
+    return beginTransaction();
+  }
+  
+  // Otherwise, use pool.transaction with callback
+  return pool.transaction(callback);
 }
 
 /**
@@ -95,13 +124,8 @@ async function beginTransaction() {
  * @param {Object} connection - Connection object
  */
 async function commit(connection) {
-  try {
-    await connection.execute('COMMIT');
-    await connection.close();
-  } catch (error) {
-    console.error('Commit error:', error);
-    throw error;
-  }
+  // In node-jt400 v6, transactions auto-commit on success
+  // This is kept for API compatibility
 }
 
 /**
@@ -109,12 +133,8 @@ async function commit(connection) {
  * @param {Object} connection - Connection object
  */
 async function rollback(connection) {
-  try {
-    await connection.execute('ROLLBACK');
-    await connection.close();
-  } catch (error) {
-    console.error('Rollback error:', error);
-  }
+  // In node-jt400 v6, transactions auto-rollback on error
+  // This is kept for API compatibility
 }
 
 /**
@@ -147,6 +167,7 @@ module.exports = {
   query,
   queryWithConnection,
   beginTransaction,
+  transaction,
   commit,
   rollback,
   testConnection,

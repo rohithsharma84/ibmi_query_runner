@@ -42,11 +42,8 @@ async function login(userId, password) {
         password: password,
       });
       
-      const connection = await testPool.connect();
-      
       // Test the connection with a simple query
-      await connection.execute('SELECT 1 FROM SYSIBM.SYSDUMMY1');
-      await connection.close();
+      await testPool.query('SELECT 1 FROM SYSIBM.SYSDUMMY1');
       
       authenticated = true;
       logger.info('IBM i authentication successful:', { userId: userIdUpper });
