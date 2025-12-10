@@ -3,7 +3,7 @@
  * Handles user authentication with IBM i user profiles
  */
 
-const { Connection, Toolkit } = require('itoolkit');
+const { Connection, iSql } = require('itoolkit');
 const { parseString } = require('xml2js');
 const { promisify } = require('util');
 const { ApiError } = require('../middleware/errorHandler');
@@ -54,12 +54,18 @@ async function login(userId, password) {
 
       // Test the connection with a simple query
       await new Promise((resolve, reject) => {
-        const toolkit = new Toolkit(connection);
-        toolkit.iSql('SELECT 1 FROM SYSIBM.SYSDUMMY1', (error, result) => {
+        const sql = new iSql();
+        sql.addQuery('SELECT 1 FROM SYSIBM.SYSDUMMY1');
+        sql.fetch();
+        sql.free();
+        
+        connection.add(sql);
+        
+        connection.run((error, xmlOutput) => {
           if (error) {
             return reject(error);
           }
-          resolve(result);
+          resolve(xmlOutput);
         });
       });
       

@@ -4,7 +4,7 @@
  */
 
 require('dotenv').config();
-const { Connection, CommandCall, Toolkit } = require('itoolkit');
+const { Connection, CommandCall, iSql } = require('itoolkit');
 const { parseString } = require('xml2js');
 const { promisify } = require('util');
 
@@ -62,14 +62,21 @@ async function query(sql, params = []) {
       });
     }
 
-    const toolkit = new Toolkit(connection);
+    const sql = new iSql();
+    sql.addQuery(finalSql);
+    sql.fetch();
+    sql.free();
+    
+    connection.add(sql);
     
     // Execute SQL using iSql
-    toolkit.iSql(finalSql, (error, result) => {
+    connection.run((error, xmlOutput) => {
       if (error) {
         console.error('Database query error:', error);
         return reject(new Error(`Failed to execute query: ${error.message}`));
       }
+      
+      const result = xmlOutput;
       
       try {
         // Parse XML result
