@@ -14,24 +14,36 @@
         <span class="ml-3 text-gray-600">Loading comparison...</span>
       </div>
 
-      <div v-else-if="comparison" class="mt-2">
-        <h1 class="text-3xl font-bold text-gray-900">
-          {{ comparison.baseline_run_name }} vs {{ comparison.comparison_run_name }}
-        </h1>
-        <div class="flex items-center space-x-4 mt-3 text-sm text-gray-500">
-          <span class="flex items-center">
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            {{ formatDate(comparison.created_at) }}
-          </span>
-          <span class="flex items-center">
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-            </svg>
-            Threshold: {{ comparison.deviation_threshold }}%
-          </span>
+      <div v-else-if="comparison" class="flex justify-between items-start mt-2">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900">
+            {{ comparison.baseline_run_name }} vs {{ comparison.comparison_run_name }}
+          </h1>
+          <div class="flex items-center space-x-4 mt-3 text-sm text-gray-500">
+            <span class="flex items-center">
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              {{ formatDate(comparison.created_at) }}
+            </span>
+            <span class="flex items-center">
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+              Threshold: {{ comparison.deviation_threshold }}%
+            </span>
+          </div>
         </div>
+
+        <button
+          @click="exportReport"
+          class="btn-secondary"
+        >
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export Report
+        </button>
       </div>
     </div>
 
@@ -398,5 +410,13 @@ function getChangeColorClass(change) {
 
 function viewQueryDetails(query) {
   selectedQuery.value = query
+}
+
+const exportReport = () => {
+  if (!comparison.value || !queryDetails.value) return
+  
+  const html = generateComparisonReport(comparison.value, queryDetails.value)
+  const filename = `comparison-${comparison.value.comparison_id}-${Date.now()}.html`
+  downloadReport(html, filename)
 }
 </script>

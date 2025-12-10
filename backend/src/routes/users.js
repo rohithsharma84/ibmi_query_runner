@@ -73,6 +73,25 @@ router.get('/:userId', asyncHandler(userController.getUser));
  *   "user": { ... }
  * }
  */
+/**
+ * PUT /api/users/:userId
+ * Update user
+ * Requires admin privileges
+ * 
+ * Request body:
+ * {
+ *   "is_admin": false,
+ *   "is_active": true
+ * }
+ * 
+ * Response:
+ * {
+ *   "success": true,
+ *   "message": "User updated successfully"
+ * }
+ */
+router.put('/:userId', requireAdmin, asyncHandler(userController.updateUser));
+
 router.post('/', requireAdmin, asyncHandler(userController.createUser));
 
 /**

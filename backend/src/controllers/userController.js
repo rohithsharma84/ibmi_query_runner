@@ -158,6 +158,50 @@ async function deleteUser(req, res) {
     success: true,
     message: 'User deleted successfully',
   });
+/**
+ * PUT /api/users/:userId
+ * Update user (admin only)
+ */
+async function updateUser(req, res) {
+  const { userId } = req.params;
+  const { is_admin, is_active } = req.body;
+  
+  // Don't allow changing your own admin status
+  if (userId.toUpperCase() === req.user.userId.toUpperCase() && is_admin === false) {
+    throw new ApiError(
+      HTTP_STATUS.FORBIDDEN,
+      'Cannot remove your own admin privileges',
+      ERROR_CODES.AUTHORIZATION_FAILED
+    );
+  }
+  
+  // Check if user exists
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(
+      HTTP_STATUS.NOT_FOUND,
+      'User not found',
+      ERROR_CODES.NOT_FOUND
+    );
+  }
+  
+  // Update user
+  await User.update(userId, {
+    isAdmin: is_admin,
+    isActive: is_active
+  });
+  
+  logger.info('User updated by admin:', { 
+    userId, 
+    updatedBy: req.user.userId 
+  });
+  
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: 'User updated successfully',
+  });
+}
+
 }
 
 module.exports = {

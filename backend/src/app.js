@@ -5,6 +5,7 @@
 
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -13,6 +14,7 @@ const appConfig = require('./config/app');
 const { testConnection } = require('./config/database');
 const logger = require('./utils/logger');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const websocketService = require('./services/websocketService');
 
 // Create Express app
 const app = express();
@@ -99,11 +101,19 @@ async function startServer() {
     
     logger.info('Database connection successful');
     
+    // Create HTTP server
+    const server = http.createServer(app);
+    
+    // Initialize WebSocket server
+    websocketService.initialize(server);
+    logger.info('WebSocket server initialized');
+    
     // Start HTTP server
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       logger.info(`Server started on port ${PORT}`);
       logger.info(`Environment: ${appConfig.env}`);
       logger.info(`Health check: http://localhost:${PORT}/health`);
+      logger.info(`WebSocket endpoint: ws://localhost:${PORT}/ws`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
