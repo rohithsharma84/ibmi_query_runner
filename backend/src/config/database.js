@@ -11,15 +11,24 @@ const config = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   library: process.env.DB_LIBRARY || 'YOURLIB',
-  port: parseInt(process.env.DB_PORT, 10) || 8471,
+  port: parseInt(process.env.DB_PORT, 10) || 9471,
+  secure: process.env.DB_SECURE === 'true',
 };
 
-// Create connection pool
-const pool = jt400.pool({
+// Create connection pool with secure connection support
+const poolConfig = {
   host: config.host,
   user: config.user,
   password: config.password,
-});
+};
+
+// Add secure connection properties for JT400 if enabled
+if (config.secure) {
+  poolConfig.secure = true;
+  poolConfig.port = config.port;
+}
+
+const pool = jt400.pool(poolConfig);
 
 /**
  * Get a database connection from the pool
