@@ -70,16 +70,16 @@ async function createFromPlanCache(req, res, next) {
 async function createManual(req, res, next) {
   try {
     const { setName, description, userProfile, queries } = req.body;
-    
-    // Validate required fields
-    if (!setName || !userProfile || !queries) {
+
+    // Validate required fields (queries may be provided or added later)
+    if (!setName || !userProfile) {
       throw new ApiError(
         HTTP_STATUS.BAD_REQUEST,
-        'setName, userProfile, and queries are required',
+        'setName and userProfile are required',
         ERROR_CODES.VALIDATION_ERROR
       );
     }
-    
+
     if (!isValidUserProfile(userProfile)) {
       throw new ApiError(
         HTTP_STATUS.BAD_REQUEST,
@@ -87,29 +87,34 @@ async function createManual(req, res, next) {
         ERROR_CODES.VALIDATION_ERROR
       );
     }
-    
-    if (!Array.isArray(queries) || queries.length === 0) {
-      throw new ApiError(
-        HTTP_STATUS.BAD_REQUEST,
-        'queries must be a non-empty array',
-        ERROR_CODES.VALIDATION_ERROR
-      );
+
+    // queries are optional for manual creation; default to empty array
+    let queriesToUse = [];
+    if (queries !== undefined) {
+      if (!Array.isArray(queries)) {
+        throw new ApiError(
+          HTTP_STATUS.BAD_REQUEST,
+          'queries must be an array',
+          ERROR_CODES.VALIDATION_ERROR
+        );
+      }
+      queriesToUse = queries;
     }
-    
+
     const setData = {
       setName,
       description,
       userProfile,
       createdBy: req.user.userId,
     };
-    
+
     logger.info('Creating query set manually:', {
       userId: req.user.userId,
       setName,
-      queryCount: queries.length,
+      queryCount: queriesToUse.length,
     });
-    
-    const querySet = await querySetService.createManual(setData, queries);
+
+    const querySet = await querySetService.createManual(setData, queriesToUse);
     
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
