@@ -20,9 +20,10 @@ const logger = require('../utils/logger');
  * @returns {Promise<Object>} Created query set with ID
  */
 async function create(setData, queries = []) {
-  const conn = await transaction();
-  
   try {
+    // Use pool.transaction(callback) via transaction(callback) so all statements
+    // run on the same connection and transaction is handled by the pool.
+    const result = await transaction(async (conn) => {
       const { setName, description, userProfile, createdBy, importDateFrom, importDateTo, planCacheView, additionalFilters } = setData;
 
       // Use a sensible default for planCacheView if not provided
@@ -47,34 +48,33 @@ async function create(setData, queries = []) {
         createdBy.toUpperCase(),
       ]);
 
-      // Retrieve the generated SET_ID (IDENTITY)
+      // Retrieve the generated SET_ID (IDENTITY) on the same connection
       const idRes = await conn.execute("SELECT IDENTITY_VAL_LOCAL() AS SET_ID FROM SYSIBM.SYSDUMMY1");
       const setId = idRes && idRes.length > 0 ? idRes[0].SET_ID : null;
-    
-    // Add queries if provided
-    if (queries && queries.length > 0) {
-      await addQueriesToSet(conn, setId, queries);
-    }
-    
-    await conn.commit();
-    
-    logger.info('Query set created:', { setId, setName, queryCount: queries.length });
-    
-    return {
-      setId,
-      setName,
-      description,
-      userProfile: userProfile.toUpperCase(),
-      createdBy: createdBy.toUpperCase(),
-      importDateFrom: importDateFrom || null,
-      importDateTo: importDateTo || null,
-      planCacheView: effectiveView,
-      additionalFilters: additionalFilters || null,
-      queryCount: queries.length,
-    };
-    
+
+      // Add queries if provided
+      if (queries && queries.length > 0) {
+        await addQueriesToSet(conn, setId, queries);
+      }
+
+      logger.info('Query set created:', { setId, setName, queryCount: queries.length });
+
+      return {
+        setId,
+        setName,
+        description,
+        userProfile: userProfile.toUpperCase(),
+        createdBy: createdBy.toUpperCase(),
+        importDateFrom: importDateFrom || null,
+        importDateTo: importDateTo || null,
+        planCacheView: effectiveView,
+        additionalFilters: additionalFilters || null,
+        queryCount: queries.length,
+      };
+    });
+
+    return result;
   } catch (error) {
-    await conn.rollback();
     logger.error('Error creating query set:', error);
     throw new ApiError(
       HTTP_STATUS.INTERNAL_SERVER_ERROR,
@@ -82,8 +82,6 @@ async function create(setData, queries = []) {
       ERROR_CODES.DATABASE_ERROR,
       error.message
     );
-  } finally {
-    await conn.close();
   }
 }
 
