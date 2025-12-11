@@ -50,7 +50,34 @@ async function create(setData, queries = []) {
 
       // Retrieve the generated SET_ID (IDENTITY) on the same connection
       const idRes = await conn.execute("SELECT IDENTITY_VAL_LOCAL() AS SET_ID FROM SYSIBM.SYSDUMMY1");
-      const setId = idRes && idRes.length > 0 ? idRes[0].SET_ID : null;
+      // node-jt400 / driver may return column keys in different cases or shapes; handle several variants
+      let setId = null;
+      if (idRes && idRes.length > 0) {
+        const idRow = idRes[0];
+        setId = idRow.SET_ID ?? idRow.Set_Id ?? idRow.set_id ?? idRow['IDENTITY_VAL_LOCAL()'] ?? idRow.IDENTITY_VAL_LOCAL ?? idRow.ID;
+        if (setId !== null && setId !== undefined) {
+          // coerce to number when possible
+          const numeric = Number(setId);
+          setId = Number.isFinite(numeric) ? numeric : setId;
+        }
+      }
+
+      // Fallback: if identity was not returned, try to look up the row by unique combination
+      if (setId === null || setId === undefined) {
+        try {
+          const fallbackSql = `SELECT SET_ID FROM ${getTableName('QRYRUN_QUERY_SETS')} WHERE SET_NAME = ? AND CREATED_BY = ? ORDER BY CREATED_AT DESC FETCH FIRST 1 ROWS ONLY`;
+          const fallbackRes = await conn.execute(fallbackSql, [setName, createdBy.toUpperCase()]);
+          if (fallbackRes && fallbackRes.length > 0) {
+            const r = fallbackRes[0];
+            setId = r.SET_ID ?? r.set_id ?? r.Set_Id ?? r.ID ?? null;
+            const numeric = Number(setId);
+            setId = Number.isFinite(numeric) ? numeric : setId;
+          }
+        } catch (fbErr) {
+          // ignore fallback errors here; we'll let the main flow return without id if unavoidable
+          logger.warn('Fallback lookup for SET_ID failed', { error: fbErr.message });
+        }
+      }
 
       // Add queries if provided
       if (queries && queries.length > 0) {
