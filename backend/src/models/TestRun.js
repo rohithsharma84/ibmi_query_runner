@@ -22,26 +22,27 @@ async function create(runData) {
   try {
     const { setId, runLabel, iterationCount, metricsLevel, createdBy } = runData;
     
-    // Generate unique run ID
-    const runId = `TR${Date.now()}`;
-    
-    // Insert test run
+    // Insert test run (RUN_ID is an IDENTITY column)
     const sql = `
       INSERT INTO ${getTableName('QRYRUN_TEST_RUNS')}
-      (RUN_ID, SET_ID, RUN_LABEL, ITERATION_COUNT, METRICS_LEVEL, 
+      (SET_ID, RUN_NAME, RUN_DESCRIPTION, ITERATION_COUNT, METRICS_LEVEL,
        STATUS, CREATED_BY, CREATED_AT)
       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `;
-    
+
     await query(sql, [
-      runId,
       setId,
       runLabel,
+      runDescription || null,
       iterationCount,
       metricsLevel,
       RUN_STATUS.PENDING,
       createdBy.toUpperCase(),
     ]);
+
+    // Retrieve generated RUN_ID
+    const idRes = await query("SELECT IDENTITY_VAL_LOCAL() AS RUN_ID FROM SYSIBM.SYSDUMMY1");
+    const runId = idRes && idRes.length > 0 ? idRes[0].RUN_ID : null;
     
     logger.info('Test run created:', { runId, setId, runLabel });
     
@@ -77,7 +78,8 @@ async function findById(runId) {
       SELECT 
         RUN_ID,
         SET_ID,
-        RUN_LABEL,
+        RUN_NAME AS RUN_NAME,
+        RUN_DESCRIPTION AS RUN_DESCRIPTION,
         ITERATION_COUNT,
         METRICS_LEVEL,
         STATUS,
@@ -86,7 +88,8 @@ async function findById(runId) {
         TOTAL_QUERIES,
         SUCCESSFUL_QUERIES,
         FAILED_QUERIES,
-        TOTAL_EXECUTION_TIME,
+        TOTAL_EXECUTIONS,
+        AVG_DURATION_MS AS AVG_EXECUTION_TIME,
         CREATED_BY,
         CREATED_AT
       FROM ${getTableName('QRYRUN_TEST_RUNS')}
@@ -117,7 +120,8 @@ async function findBySetId(setId) {
       SELECT 
         RUN_ID,
         SET_ID,
-        RUN_LABEL,
+        RUN_NAME AS RUN_NAME,
+        RUN_DESCRIPTION AS RUN_DESCRIPTION,
         ITERATION_COUNT,
         METRICS_LEVEL,
         STATUS,
@@ -126,7 +130,8 @@ async function findBySetId(setId) {
         TOTAL_QUERIES,
         SUCCESSFUL_QUERIES,
         FAILED_QUERIES,
-        TOTAL_EXECUTION_TIME,
+        TOTAL_EXECUTIONS,
+        AVG_DURATION_MS AS AVG_EXECUTION_TIME,
         CREATED_BY,
         CREATED_AT
       FROM ${getTableName('QRYRUN_TEST_RUNS')}
@@ -159,7 +164,7 @@ async function findAll(filters = {}) {
       SELECT 
         tr.RUN_ID,
         tr.SET_ID,
-        tr.RUN_LABEL,
+        tr.RUN_NAME AS RUN_NAME,
         tr.ITERATION_COUNT,
         tr.METRICS_LEVEL,
         tr.STATUS,
@@ -168,7 +173,8 @@ async function findAll(filters = {}) {
         tr.TOTAL_QUERIES,
         tr.SUCCESSFUL_QUERIES,
         tr.FAILED_QUERIES,
-        tr.TOTAL_EXECUTION_TIME,
+        tr.TOTAL_EXECUTIONS,
+        tr.AVG_DURATION_MS AS AVG_EXECUTION_TIME,
         tr.CREATED_BY,
         tr.CREATED_AT,
         qs.SET_NAME
@@ -261,21 +267,28 @@ async function updateStatus(runId, status, additionalData = {}) {
  */
 async function updateStatistics(runId, stats) {
   try {
+    // Map provided stats to DB columns. AVG_DURATION_MS will be computed if totalExecutionTime and totalExecutions provided.
+    let avgMs = null;
+    if (stats.totalExecutionTime !== undefined) {
+      const denom = stats.totalExecutions || stats.totalQueries || 1;
+      avgMs = stats.totalExecutionTime / Math.max(denom, 1);
+    }
+
     const sql = `
       UPDATE ${getTableName('QRYRUN_TEST_RUNS')}
       SET 
         TOTAL_QUERIES = ?,
         SUCCESSFUL_QUERIES = ?,
         FAILED_QUERIES = ?,
-        TOTAL_EXECUTION_TIME = ?
+        AVG_DURATION_MS = COALESCE(?, AVG_DURATION_MS)
       WHERE RUN_ID = ?
     `;
-    
+
     await query(sql, [
       stats.totalQueries || 0,
       stats.successfulQueries || 0,
       stats.failedQueries || 0,
-      stats.totalExecutionTime || 0,
+      avgMs,
       runId,
     ]);
     
@@ -349,9 +362,9 @@ async function getSummary(runId) {
         COUNT(*) AS TOTAL_EXECUTIONS,
         SUM(CASE WHEN STATUS = 'COMPLETED' THEN 1 ELSE 0 END) AS SUCCESSFUL_EXECUTIONS,
         SUM(CASE WHEN STATUS = 'FAILED' THEN 1 ELSE 0 END) AS FAILED_EXECUTIONS,
-        AVG(EXECUTION_TIME) AS AVG_EXECUTION_TIME,
-        MIN(EXECUTION_TIME) AS MIN_EXECUTION_TIME,
-        MAX(EXECUTION_TIME) AS MAX_EXECUTION_TIME
+        AVG(DURATION_MS) AS AVG_EXECUTION_TIME,
+        MIN(DURATION_MS) AS MIN_EXECUTION_TIME,
+        MAX(DURATION_MS) AS MAX_EXECUTION_TIME
       FROM ${getTableName('QRYRUN_EXECUTIONS')}
       WHERE RUN_ID = ?
     `;

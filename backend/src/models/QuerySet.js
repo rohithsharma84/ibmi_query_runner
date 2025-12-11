@@ -23,25 +23,25 @@ async function create(setData, queries = []) {
   const conn = await transaction();
   
   try {
-    const { setName, description, userProfile, createdBy } = setData;
-    
-    // Generate unique set ID
-    const setId = `QS${Date.now()}`;
-    
-    // Insert query set
-    const insertSetSql = `
-      INSERT INTO ${getTableName('QRYRUN_QUERY_SETS')} 
-      (SET_ID, SET_NAME, DESCRIPTION, USER_PROFILE, CREATED_BY, CREATED_AT, IS_ACTIVE)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 1)
-    `;
-    
-    await conn.execute(insertSetSql, [
-      setId,
-      setName,
-      description || null,
-      userProfile.toUpperCase(),
-      createdBy.toUpperCase(),
-    ]);
+      const { setName, description, userProfile, createdBy } = setData;
+
+      // Insert query set (SET_ID is an IDENTITY column, let the DB generate it)
+      const insertSetSql = `
+        INSERT INTO ${getTableName('QRYRUN_QUERY_SETS')}
+        (SET_NAME, SET_DESCRIPTION, SOURCE_USER_PROFILE, CREATED_BY, CREATED_AT, IS_ACTIVE, QUERY_COUNT)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 'Y', 0)
+      `;
+
+      await conn.execute(insertSetSql, [
+        setName,
+        description || null,
+        userProfile.toUpperCase(),
+        createdBy.toUpperCase(),
+      ]);
+
+      // Retrieve the generated SET_ID (IDENTITY)
+      const idRes = await conn.execute("SELECT IDENTITY_VAL_LOCAL() AS SET_ID FROM SYSIBM.SYSDUMMY1");
+      const setId = idRes && idRes.length > 0 ? idRes[0].SET_ID : null;
     
     // Add queries if provided
     if (queries && queries.length > 0) {
@@ -101,24 +101,23 @@ async function addQueriesToSet(conn, setId, queries) {
     if (existing.length === 0) {
       // Generate unique query ID
       const queryId = `Q${Date.now()}${i}`;
-      
-      // Insert query
+
+      // Insert query (map fields to DB schema)
       const insertQuerySql = `
         INSERT INTO ${getTableName('QRYRUN_QUERIES')}
-        (QUERY_ID, SET_ID, QUERY_TEXT, QUERY_HASH, SEQUENCE_NUMBER, 
-         STATEMENT_TYPE, ORIGINAL_USER, ORIGINAL_RUN_COUNT, IS_ACTIVE)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+        (QUERY_ID, SET_ID, QUERY_TEXT, QUERY_NAME, QUERY_HASH, SOURCE_USER, PLAN_CACHE_KEY, ADDED_AT, LAST_SEEN_IN_CACHE, IS_ACTIVE, SEQUENCE_NUM)
+        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, NULL, 'Y', ?)
       `;
-      
+
       await conn.execute(insertQuerySql, [
         queryId,
         setId,
         queryText,
+        queryObj.queryName || queryObj.QUERY_NAME || null,
         queryHash,
-        i + 1,
-        queryObj.statementType || queryObj.STATEMENT_TYPE || 'UNKNOWN',
         queryObj.userName || queryObj.USER_NAME || null,
-        queryObj.numberRuns || queryObj.NUMBER_RUNS || 0,
+        queryObj.planCacheKey || queryObj.PLAN_CACHE_KEY || null,
+        i + 1,
       ]);
       
       addedCount++;
@@ -139,14 +138,14 @@ async function findById(setId) {
       SELECT 
         SET_ID,
         SET_NAME,
-        DESCRIPTION,
-        USER_PROFILE,
+        SET_DESCRIPTION AS DESCRIPTION,
+        SOURCE_USER_PROFILE AS USER_PROFILE,
         CREATED_BY,
         CREATED_AT,
-        LAST_REFRESHED_AT,
+        LAST_REFRESHED AS LAST_REFRESHED_AT,
         IS_ACTIVE
       FROM ${getTableName('QRYRUN_QUERY_SETS')}
-      WHERE SET_ID = ? AND IS_ACTIVE = 1
+      WHERE SET_ID = ? AND IS_ACTIVE = 'Y'
     `;
     
     const results = await query(sql, [setId]);
@@ -175,16 +174,16 @@ async function findAll(filters = {}) {
       SELECT 
         qs.SET_ID,
         qs.SET_NAME,
-        qs.DESCRIPTION,
-        qs.USER_PROFILE,
+        qs.SET_DESCRIPTION AS DESCRIPTION,
+        qs.SOURCE_USER_PROFILE AS USER_PROFILE,
         qs.CREATED_BY,
         qs.CREATED_AT,
-        qs.LAST_REFRESHED_AT,
+        qs.LAST_REFRESHED AS LAST_REFRESHED_AT,
         COUNT(q.QUERY_ID) AS QUERY_COUNT
       FROM ${getTableName('QRYRUN_QUERY_SETS')} qs
       LEFT JOIN ${getTableName('QRYRUN_QUERIES')} q 
-        ON qs.SET_ID = q.SET_ID AND q.IS_ACTIVE = 1
-      WHERE qs.IS_ACTIVE = 1
+        ON qs.SET_ID = q.SET_ID AND q.IS_ACTIVE = 'Y'
+      WHERE qs.IS_ACTIVE = 'Y'
     `;
     
     const params = [];
@@ -230,10 +229,10 @@ async function getQueries(setId) {
         SET_ID,
         QUERY_TEXT,
         QUERY_HASH,
-        SEQUENCE_NUMBER,
-        STATEMENT_TYPE,
-        ORIGINAL_USER,
-        ORIGINAL_RUN_COUNT,
+        SEQUENCE_NUM AS SEQUENCE_NUMBER,
+        QUERY_NAME AS QUERY_NAME,
+        SOURCE_USER AS ORIGINAL_USER,
+        0 AS ORIGINAL_RUN_COUNT,
         ADDED_AT
       FROM ${getTableName('QRYRUN_QUERIES')}
       WHERE SET_ID = ? AND IS_ACTIVE = 1

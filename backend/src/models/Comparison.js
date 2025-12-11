@@ -23,33 +23,37 @@ async function create(comparisonData) {
   try {
     const { baselineRunId, comparisonRunId, deviationThreshold, createdBy } = comparisonData;
     
-    // Generate unique comparison ID
-    const comparisonId = `CMP${Date.now()}`;
-    
-    // Insert comparison record
+    // Insert comparison record (COMPARISON_ID is IDENTITY)
     const sql = `
       INSERT INTO ${getTableName('QRYRUN_COMPARISONS')}
-      (COMPARISON_ID, BASELINE_RUN_ID, COMPARISON_RUN_ID, 
-       DEVIATION_THRESHOLD, CREATED_BY, CREATED_AT)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      (BASELINE_RUN_ID, COMPARISON_RUN_ID, DEVIATION_THRESHOLD, CREATED_BY, CREATED_AT)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
     `;
-    
+
     await conn.execute(sql, [
-      comparisonId,
       baselineRunId,
       comparisonRunId,
       deviationThreshold,
       createdBy.toUpperCase(),
     ]);
-    
+
+    // get generated id
+    const idRes = await conn.execute("SELECT IDENTITY_VAL_LOCAL() AS COMPARISON_ID FROM SYSIBM.SYSDUMMY1");
+    let comparisonId = null;
+    if (idRes && idRes.length > 0) {
+      // some drivers return array of results
+      const row = Array.isArray(idRes) ? idRes[0] : idRes;
+      comparisonId = row.COMPARISON_ID || (row[0] && row[0].COMPARISON_ID) || null;
+    }
+
     await conn.commit();
-    
+
     logger.info('Comparison created:', {
       comparisonId,
       baselineRunId,
       comparisonRunId,
     });
-    
+
     return {
       comparisonId,
       baselineRunId,
@@ -85,13 +89,16 @@ async function findById(comparisonId) {
         BASELINE_RUN_ID,
         COMPARISON_RUN_ID,
         DEVIATION_THRESHOLD,
-        TOTAL_QUERIES_COMPARED,
-        QUERIES_WITH_DEVIATION,
-        QUERIES_IMPROVED,
-        QUERIES_DEGRADED,
-        AVG_BASELINE_TIME,
-        AVG_COMPARISON_TIME,
-        OVERALL_CHANGE_PERCENT,
+        SET_LEVEL_CHANGE AS OVERALL_CHANGE_PERCENT,
+        SET_LEVEL_CHANGE AS AVG_DURATION_CHANGE,
+        QUERIES_ANALYZED AS TOTAL_QUERIES,
+        QUERIES_ANALYZED AS TOTAL_QUERIES_COMPARED,
+        QUERIES_IMPROVED AS QUERIES_IMPROVED,
+        QUERIES_DEGRADED AS QUERIES_DEGRADED,
+        QUERIES_UNCHANGED AS QUERIES_UNCHANGED,
+        QUERIES_FAILED_BASELINE AS QUERIES_FAILED_BASELINE,
+        QUERIES_FAILED_COMPARISON AS QUERIES_FAILED_COMPARISON,
+        (COALESCE(QUERIES_IMPROVED,0) + COALESCE(QUERIES_DEGRADED,0)) AS QUERIES_WITH_DEVIATIONS,
         CREATED_BY,
         CREATED_AT
       FROM ${getTableName('QRYRUN_COMPARISONS')}
@@ -127,17 +134,20 @@ async function findAll(filters = {}) {
         c.BASELINE_RUN_ID,
         c.COMPARISON_RUN_ID,
         c.DEVIATION_THRESHOLD,
-        c.TOTAL_QUERIES_COMPARED,
-        c.QUERIES_WITH_DEVIATION,
-        c.QUERIES_IMPROVED,
-        c.QUERIES_DEGRADED,
-        c.AVG_BASELINE_TIME,
-        c.AVG_COMPARISON_TIME,
-        c.OVERALL_CHANGE_PERCENT,
+        c.SET_LEVEL_CHANGE AS OVERALL_CHANGE_PERCENT,
+        c.SET_LEVEL_CHANGE AS AVG_DURATION_CHANGE,
+        c.QUERIES_ANALYZED AS TOTAL_QUERIES,
+        c.QUERIES_ANALYZED AS TOTAL_QUERIES_COMPARED,
+        c.QUERIES_IMPROVED AS QUERIES_IMPROVED,
+        c.QUERIES_DEGRADED AS QUERIES_DEGRADED,
+        c.QUERIES_UNCHANGED AS QUERIES_UNCHANGED,
+        c.QUERIES_FAILED_BASELINE AS QUERIES_FAILED_BASELINE,
+        c.QUERIES_FAILED_COMPARISON AS QUERIES_FAILED_COMPARISON,
+        (COALESCE(c.QUERIES_IMPROVED,0) + COALESCE(c.QUERIES_DEGRADED,0)) AS QUERIES_WITH_DEVIATIONS,
         c.CREATED_BY,
         c.CREATED_AT,
-        br.RUN_LABEL AS BASELINE_LABEL,
-        cr.RUN_LABEL AS COMPARISON_LABEL
+        br.RUN_NAME AS BASELINE_RUN_NAME,
+        cr.RUN_NAME AS COMPARISON_RUN_NAME
       FROM ${getTableName('QRYRUN_COMPARISONS')} c
       JOIN ${getTableName('QRYRUN_TEST_RUNS')} br ON c.BASELINE_RUN_ID = br.RUN_ID
       JOIN ${getTableName('QRYRUN_TEST_RUNS')} cr ON c.COMPARISON_RUN_ID = cr.RUN_ID
@@ -186,24 +196,24 @@ async function updateStatistics(comparisonId, stats) {
     const sql = `
       UPDATE ${getTableName('QRYRUN_COMPARISONS')}
       SET 
-        TOTAL_QUERIES_COMPARED = ?,
-        QUERIES_WITH_DEVIATION = ?,
+        SET_LEVEL_CHANGE = ?,
+        QUERIES_ANALYZED = ?,
         QUERIES_IMPROVED = ?,
         QUERIES_DEGRADED = ?,
-        AVG_BASELINE_TIME = ?,
-        AVG_COMPARISON_TIME = ?,
-        OVERALL_CHANGE_PERCENT = ?
+        QUERIES_UNCHANGED = ?,
+        QUERIES_FAILED_BASELINE = ?,
+        QUERIES_FAILED_COMPARISON = ?
       WHERE COMPARISON_ID = ?
     `;
-    
+
     await query(sql, [
+      stats.setLevelChange || null,
       stats.totalQueriesCompared || 0,
-      stats.queriesWithDeviation || 0,
       stats.queriesImproved || 0,
       stats.queriesDegraded || 0,
-      stats.avgBaselineTime || 0,
-      stats.avgComparisonTime || 0,
-      stats.overallChangePercent || 0,
+      stats.queriesUnchanged || 0,
+      stats.queriesFailedBaseline || 0,
+      stats.queriesFailedComparison || 0,
       comparisonId,
     ]);
     
@@ -275,32 +285,44 @@ async function addDetail(detailData) {
       queryId,
       baselineAvgTime,
       comparisonAvgTime,
-      timeDifference,
+      baselineMin,
+      comparisonMin,
+      baselineMax,
+      comparisonMax,
       percentChange,
       hasDeviation,
       isImprovement,
+      baselineFailures,
+      comparisonFailures,
     } = detailData;
-    
+
+    const status = isImprovement ? 'IMPROVED' : (hasDeviation ? 'DEGRADED' : 'UNCHANGED');
+
     const sql = `
       INSERT INTO ${getTableName('QRYRUN_COMPARISON_DETAILS')}
-      (COMPARISON_ID, QUERY_ID, BASELINE_AVG_TIME, COMPARISON_AVG_TIME,
-       TIME_DIFFERENCE, PERCENT_CHANGE, HAS_DEVIATION, IS_IMPROVEMENT)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      (COMPARISON_ID, QUERY_ID, BASELINE_AVG_MS, COMPARISON_AVG_MS,
+       BASELINE_MIN_MS, COMPARISON_MIN_MS, BASELINE_MAX_MS, COMPARISON_MAX_MS,
+       PERCENT_CHANGE, STATUS, BASELINE_FAILURES, COMPARISON_FAILURES)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    
+
     await query(sql, [
       comparisonId,
       queryId,
-      baselineAvgTime,
-      comparisonAvgTime,
-      timeDifference,
-      percentChange,
-      hasDeviation ? 1 : 0,
-      isImprovement ? 1 : 0,
+      baselineAvgTime || null,
+      comparisonAvgTime || null,
+      baselineMin || null,
+      comparisonMin || null,
+      baselineMax || null,
+      comparisonMax || null,
+      percentChange || null,
+      status,
+      baselineFailures || 0,
+      comparisonFailures || 0,
     ]);
-    
+
     return detailData;
-    
+
   } catch (error) {
     logger.error('Error adding comparison detail:', error);
     throw new ApiError(
@@ -323,19 +345,23 @@ async function getDetails(comparisonId) {
       SELECT 
         cd.COMPARISON_ID,
         cd.QUERY_ID,
-        cd.BASELINE_AVG_TIME,
-        cd.COMPARISON_AVG_TIME,
-        cd.TIME_DIFFERENCE,
-        cd.PERCENT_CHANGE,
-        cd.HAS_DEVIATION,
-        cd.IS_IMPROVEMENT,
+  cd.BASELINE_AVG_MS AS BASELINE_AVG_DURATION,
+  cd.COMPARISON_AVG_MS AS COMPARISON_AVG_DURATION,
+  cd.BASELINE_MIN_MS AS BASELINE_MIN_DURATION,
+  cd.COMPARISON_MIN_MS AS COMPARISON_MIN_DURATION,
+  cd.BASELINE_MAX_MS AS BASELINE_MAX_DURATION,
+  cd.COMPARISON_MAX_MS AS COMPARISON_MAX_DURATION,
+        cd.PERCENT_CHANGE AS PERCENT_CHANGE,
+        cd.STATUS AS STATUS,
+        cd.BASELINE_FAILURES AS BASELINE_FAILURES,
+        cd.COMPARISON_FAILURES AS COMPARISON_FAILURES,
         q.QUERY_TEXT,
-        q.SEQUENCE_NUMBER,
-        q.STATEMENT_TYPE
+        q.SEQUENCE_NUM AS SEQUENCE_NUMBER,
+        NULL AS STATEMENT_TYPE
       FROM ${getTableName('QRYRUN_COMPARISON_DETAILS')} cd
       JOIN ${getTableName('QRYRUN_QUERIES')} q ON cd.QUERY_ID = q.QUERY_ID
       WHERE cd.COMPARISON_ID = ?
-      ORDER BY q.SEQUENCE_NUMBER
+      ORDER BY q.SEQUENCE_NUM
     `;
     
     return await query(sql, [comparisonId]);
@@ -360,17 +386,16 @@ async function getQueriesWithDeviations(comparisonId) {
     const sql = `
       SELECT 
         cd.QUERY_ID,
-        cd.BASELINE_AVG_TIME,
-        cd.COMPARISON_AVG_TIME,
-        cd.TIME_DIFFERENCE,
-        cd.PERCENT_CHANGE,
-        cd.IS_IMPROVEMENT,
+        cd.PERCENT_CHANGE AS PERCENT_CHANGE,
+        cd.STATUS AS STATUS,
         q.QUERY_TEXT,
-        q.SEQUENCE_NUMBER,
-        q.STATEMENT_TYPE
+        q.SEQUENCE_NUM AS SEQUENCE_NUMBER,
+        NULL AS STATEMENT_TYPE,
+        cd.BASELINE_AVG_MS AS BASELINE_AVG_DURATION,
+        cd.COMPARISON_AVG_MS AS COMPARISON_AVG_DURATION
       FROM ${getTableName('QRYRUN_COMPARISON_DETAILS')} cd
       JOIN ${getTableName('QRYRUN_QUERIES')} q ON cd.QUERY_ID = q.QUERY_ID
-      WHERE cd.COMPARISON_ID = ? AND cd.HAS_DEVIATION = 1
+      WHERE cd.COMPARISON_ID = ? AND cd.STATUS <> 'UNCHANGED'
       ORDER BY ABS(cd.PERCENT_CHANGE) DESC
     `;
     

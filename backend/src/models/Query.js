@@ -22,14 +22,14 @@ async function findById(queryId) {
         SET_ID,
         QUERY_TEXT,
         QUERY_HASH,
-        SEQUENCE_NUMBER,
-        STATEMENT_TYPE,
-        ORIGINAL_USER,
-        ORIGINAL_RUN_COUNT,
+        SEQUENCE_NUM AS SEQUENCE_NUMBER,
+        QUERY_NAME AS STATEMENT_TYPE,
+        SOURCE_USER AS ORIGINAL_USER,
+        0 AS ORIGINAL_RUN_COUNT,
         ADDED_AT,
         IS_ACTIVE
       FROM ${getTableName('QRYRUN_QUERIES')}
-      WHERE QUERY_ID = ? AND IS_ACTIVE = 1
+      WHERE QUERY_ID = ? AND IS_ACTIVE = 'Y'
     `;
     
     const results = await query(sql, [queryId]);
@@ -53,14 +53,20 @@ async function findById(queryId) {
  */
 async function update(queryId, updates) {
   try {
-    const allowedFields = ['QUERY_TEXT', 'SEQUENCE_NUMBER'];
+    // Map public field names to actual DB columns
+    const fieldMap = {
+      QUERY_TEXT: 'QUERY_TEXT',
+      SEQUENCE_NUMBER: 'SEQUENCE_NUM'
+    };
+    const allowedFields = Object.keys(fieldMap);
     const setClauses = [];
     const params = [];
     
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
-        setClauses.push(`${key} = ?`);
-        
+        const dbCol = fieldMap[key];
+        setClauses.push(`${dbCol} = ?`);
+
         // If updating query text, also update hash
         if (key === 'QUERY_TEXT') {
           params.push(value);
@@ -81,7 +87,7 @@ async function update(queryId, updates) {
     const sql = `
       UPDATE ${getTableName('QRYRUN_QUERIES')}
       SET ${setClauses.join(', ')}
-      WHERE QUERY_ID = ? AND IS_ACTIVE = 1
+      WHERE QUERY_ID = ? AND IS_ACTIVE = 'Y'
     `;
     
     await query(sql, params);
@@ -108,7 +114,7 @@ async function remove(queryId) {
   try {
     const sql = `
       UPDATE ${getTableName('QRYRUN_QUERIES')}
-      SET IS_ACTIVE = 0
+      SET IS_ACTIVE = 'N'
       WHERE QUERY_ID = ?
     `;
     
@@ -139,8 +145,8 @@ async function reorder(setId, queryOrder) {
     for (let i = 0; i < queryOrder.length; i++) {
       const sql = `
         UPDATE ${getTableName('QRYRUN_QUERIES')}
-        SET SEQUENCE_NUMBER = ?
-        WHERE QUERY_ID = ? AND SET_ID = ? AND IS_ACTIVE = 1
+        SET SEQUENCE_NUM = ?
+        WHERE QUERY_ID = ? AND SET_ID = ? AND IS_ACTIVE = 'Y'
       `;
       
       await query(sql, [i + 1, queryOrder[i], setId]);
@@ -205,18 +211,19 @@ async function addToSet(setId, queryData) {
     // Insert query
     const insertSql = `
       INSERT INTO ${getTableName('QRYRUN_QUERIES')}
-      (QUERY_ID, SET_ID, QUERY_TEXT, QUERY_HASH, SEQUENCE_NUMBER, 
-       STATEMENT_TYPE, IS_ACTIVE)
-      VALUES (?, ?, ?, ?, ?, ?, 1)
+      (QUERY_ID, SET_ID, QUERY_TEXT, QUERY_NAME, QUERY_HASH, SOURCE_USER, PLAN_CACHE_KEY, ADDED_AT, LAST_SEEN_IN_CACHE, IS_ACTIVE, SEQUENCE_NUM)
+      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, NULL, 'Y', ?)
     `;
-    
+
     await query(insertSql, [
       queryId,
       setId,
       queryText,
+      queryData.queryName || queryData.QUERY_NAME || statementType || 'UNKNOWN',
       queryHash,
+      queryData.userName || queryData.USER_NAME || null,
+      queryData.planCacheKey || queryData.PLAN_CACHE_KEY || null,
       seqNum,
-      statementType || 'UNKNOWN',
     ]);
     
     logger.info('Query added to set:', { queryId, setId });

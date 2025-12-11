@@ -387,11 +387,11 @@ async function getSummary(comparisonId) {
     const insights = {
       overallTrend: comparison.OVERALL_CHANGE_PERCENT < 0 ? 'IMPROVED' : 
                     comparison.OVERALL_CHANGE_PERCENT > 0 ? 'DEGRADED' : 'UNCHANGED',
-      significantChanges: comparison.QUERIES_WITH_DEVIATION > 0,
-      improvementRate: comparison.TOTAL_QUERIES_COMPARED > 0 ?
-        (comparison.QUERIES_IMPROVED / comparison.TOTAL_QUERIES_COMPARED) * 100 : 0,
-      degradationRate: comparison.TOTAL_QUERIES_COMPARED > 0 ?
-        (comparison.QUERIES_DEGRADED / comparison.TOTAL_QUERIES_COMPARED) * 100 : 0,
+      significantChanges: (comparison.QUERIES_WITH_DEVIATIONS || 0) > 0,
+      improvementRate: (comparison.TOTAL_QUERIES_COMPARED || comparison.TOTAL_QUERIES || 0) > 0 ?
+        ((comparison.QUERIES_IMPROVED || 0) / (comparison.TOTAL_QUERIES_COMPARED || comparison.TOTAL_QUERIES)) * 100 : 0,
+      degradationRate: (comparison.TOTAL_QUERIES_COMPARED || comparison.TOTAL_QUERIES || 0) > 0 ?
+        ((comparison.QUERIES_DEGRADED || 0) / (comparison.TOTAL_QUERIES_COMPARED || comparison.TOTAL_QUERIES)) * 100 : 0,
     };
     
     return {

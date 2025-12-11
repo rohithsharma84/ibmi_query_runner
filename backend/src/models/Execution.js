@@ -20,23 +20,24 @@ async function create(execData) {
   try {
     const { runId, queryId, iterationNumber } = execData;
     
-    // Generate unique execution ID
-    const executionId = `EX${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
-    
+    // Insert execution and let DB generate EXECUTION_ID (IDENTITY)
     const sql = `
       INSERT INTO ${getTableName('QRYRUN_EXECUTIONS')}
-      (EXECUTION_ID, RUN_ID, QUERY_ID, ITERATION_NUMBER, STATUS, STARTED_AT)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      (RUN_ID, QUERY_ID, ITERATION_NUM, STATUS, START_TIME)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
     `;
-    
+
     await query(sql, [
-      executionId,
       runId,
       queryId,
       iterationNumber,
       EXECUTION_STATUS.RUNNING,
     ]);
-    
+
+    // Retrieve generated EXECUTION_ID
+    const idRes = await query("SELECT IDENTITY_VAL_LOCAL() AS EXECUTION_ID FROM SYSIBM.SYSDUMMY1");
+    const executionId = idRes && idRes.length > 0 ? idRes[0].EXECUTION_ID : null;
+
     return {
       executionId,
       runId,
@@ -72,13 +73,13 @@ async function complete(executionId, results) {
       UPDATE ${getTableName('QRYRUN_EXECUTIONS')}
       SET 
         STATUS = ?,
-        COMPLETED_AT = CURRENT_TIMESTAMP,
-        EXECUTION_TIME = ?,
+        END_TIME = CURRENT_TIMESTAMP,
+        DURATION_MS = ?,
         ROWS_AFFECTED = ?,
         ERROR_MESSAGE = ?
       WHERE EXECUTION_ID = ?
     `;
-    
+
     await query(sql, [
       results.status,
       results.executionTime,
@@ -111,11 +112,11 @@ async function findById(executionId) {
         EXECUTION_ID,
         RUN_ID,
         QUERY_ID,
-        ITERATION_NUMBER,
+        ITERATION_NUM AS ITERATION_NUMBER,
         STATUS,
-        STARTED_AT,
-        COMPLETED_AT,
-        EXECUTION_TIME,
+        START_TIME AS STARTED_AT,
+        END_TIME AS COMPLETED_AT,
+        DURATION_MS AS EXECUTION_TIME,
         ROWS_AFFECTED,
         ERROR_MESSAGE
       FROM ${getTableName('QRYRUN_EXECUTIONS')}
@@ -147,19 +148,19 @@ async function findByRunId(runId) {
         e.EXECUTION_ID,
         e.RUN_ID,
         e.QUERY_ID,
-        e.ITERATION_NUMBER,
+        e.ITERATION_NUM AS ITERATION_NUMBER,
         e.STATUS,
-        e.STARTED_AT,
-        e.COMPLETED_AT,
-        e.EXECUTION_TIME,
+        e.START_TIME AS STARTED_AT,
+        e.END_TIME AS COMPLETED_AT,
+        e.DURATION_MS AS EXECUTION_TIME,
         e.ROWS_AFFECTED,
         e.ERROR_MESSAGE,
-        q.SEQUENCE_NUMBER,
-        q.STATEMENT_TYPE
+        q.SEQUENCE_NUM AS SEQUENCE_NUMBER,
+        q.QUERY_NAME AS STATEMENT_TYPE
       FROM ${getTableName('QRYRUN_EXECUTIONS')} e
       JOIN ${getTableName('QRYRUN_QUERIES')} q ON e.QUERY_ID = q.QUERY_ID
       WHERE e.RUN_ID = ?
-      ORDER BY q.SEQUENCE_NUMBER, e.ITERATION_NUMBER
+      ORDER BY q.SEQUENCE_NUM, e.ITERATION_NUM
     `;
     
     return await query(sql, [runId]);
@@ -187,16 +188,16 @@ async function findByRunAndQuery(runId, queryId) {
         EXECUTION_ID,
         RUN_ID,
         QUERY_ID,
-        ITERATION_NUMBER,
+        ITERATION_NUM AS ITERATION_NUMBER,
         STATUS,
-        STARTED_AT,
-        COMPLETED_AT,
-        EXECUTION_TIME,
+        START_TIME AS STARTED_AT,
+        END_TIME AS COMPLETED_AT,
+        DURATION_MS AS EXECUTION_TIME,
         ROWS_AFFECTED,
         ERROR_MESSAGE
       FROM ${getTableName('QRYRUN_EXECUTIONS')}
       WHERE RUN_ID = ? AND QUERY_ID = ?
-      ORDER BY ITERATION_NUMBER
+      ORDER BY ITERATION_NUM
     `;
     
     return await query(sql, [runId, queryId]);
@@ -224,10 +225,10 @@ async function getQueryStatistics(runId, queryId) {
         COUNT(*) AS TOTAL_EXECUTIONS,
         SUM(CASE WHEN STATUS = 'COMPLETED' THEN 1 ELSE 0 END) AS SUCCESSFUL_EXECUTIONS,
         SUM(CASE WHEN STATUS = 'FAILED' THEN 1 ELSE 0 END) AS FAILED_EXECUTIONS,
-        AVG(EXECUTION_TIME) AS AVG_EXECUTION_TIME,
-        MIN(EXECUTION_TIME) AS MIN_EXECUTION_TIME,
-        MAX(EXECUTION_TIME) AS MAX_EXECUTION_TIME,
-        STDDEV(EXECUTION_TIME) AS STDDEV_EXECUTION_TIME,
+        AVG(DURATION_MS) AS AVG_EXECUTION_TIME,
+        MIN(DURATION_MS) AS MIN_EXECUTION_TIME,
+        MAX(DURATION_MS) AS MAX_EXECUTION_TIME,
+        STDDEV(DURATION_MS) AS STDDEV_EXECUTION_TIME,
         SUM(ROWS_AFFECTED) AS TOTAL_ROWS_AFFECTED
       FROM ${getTableName('QRYRUN_EXECUTIONS')}
       WHERE RUN_ID = ? AND QUERY_ID = ? AND STATUS = 'COMPLETED'
@@ -258,10 +259,10 @@ async function getRunStatistics(runId) {
         COUNT(*) AS TOTAL_EXECUTIONS,
         SUM(CASE WHEN STATUS = 'COMPLETED' THEN 1 ELSE 0 END) AS SUCCESSFUL_EXECUTIONS,
         SUM(CASE WHEN STATUS = 'FAILED' THEN 1 ELSE 0 END) AS FAILED_EXECUTIONS,
-        AVG(EXECUTION_TIME) AS AVG_EXECUTION_TIME,
-        SUM(EXECUTION_TIME) AS TOTAL_EXECUTION_TIME,
-        MIN(EXECUTION_TIME) AS MIN_EXECUTION_TIME,
-        MAX(EXECUTION_TIME) AS MAX_EXECUTION_TIME
+        AVG(DURATION_MS) AS AVG_EXECUTION_TIME,
+        SUM(DURATION_MS) AS TOTAL_EXECUTION_TIME,
+        MIN(DURATION_MS) AS MIN_EXECUTION_TIME,
+        MAX(DURATION_MS) AS MAX_EXECUTION_TIME
       FROM ${getTableName('QRYRUN_EXECUTIONS')}
       WHERE RUN_ID = ?
     `;
@@ -290,16 +291,16 @@ async function getFailedExecutions(runId) {
       SELECT 
         e.EXECUTION_ID,
         e.QUERY_ID,
-        e.ITERATION_NUMBER,
+        e.ITERATION_NUM AS ITERATION_NUMBER,
         e.ERROR_MESSAGE,
-        e.STARTED_AT,
-        e.COMPLETED_AT,
+        e.START_TIME AS STARTED_AT,
+        e.END_TIME AS COMPLETED_AT,
         q.QUERY_TEXT,
-        q.SEQUENCE_NUMBER
+        q.SEQUENCE_NUM AS SEQUENCE_NUMBER
       FROM ${getTableName('QRYRUN_EXECUTIONS')} e
       JOIN ${getTableName('QRYRUN_QUERIES')} q ON e.QUERY_ID = q.QUERY_ID
       WHERE e.RUN_ID = ? AND e.STATUS = 'FAILED'
-      ORDER BY q.SEQUENCE_NUMBER, e.ITERATION_NUMBER
+      ORDER BY q.SEQUENCE_NUM, e.ITERATION_NUM
     `;
     
     return await query(sql, [runId]);

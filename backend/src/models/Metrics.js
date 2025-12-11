@@ -28,37 +28,33 @@ async function create(metricsData) {
     const {
       executionId,
       cpuTime,
-      ioWaitTime,
-      lockWaitTime,
-      rowsRead,
-      rowsWritten,
-      tempStorageUsed,
-      sortOperations,
-      indexScans,
-      tableScans,
+      ioOperations,
+      logicalReads,
+      physicalReads,
+      tempStorageKb,
+      estimatedCost,
+      actualRows,
     } = metricsData;
-    
+
+    // DDL columns: CPU_TIME_MS, IO_OPERATIONS, LOGICAL_READS, PHYSICAL_READS, TEMP_STORAGE_KB, ESTIMATED_COST, ACTUAL_ROWS
     const sql = `
       INSERT INTO ${getTableName('QRYRUN_METRICS')}
-      (EXECUTION_ID, CPU_TIME, IO_WAIT_TIME, LOCK_WAIT_TIME, 
-       ROWS_READ, ROWS_WRITTEN, TEMP_STORAGE_USED, 
-       SORT_OPERATIONS, INDEX_SCANS, TABLE_SCANS, COLLECTED_AT)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      (EXECUTION_ID, CPU_TIME_MS, IO_OPERATIONS, LOGICAL_READS, PHYSICAL_READS,
+       TEMP_STORAGE_KB, ESTIMATED_COST, ACTUAL_ROWS)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    
+
     await query(sql, [
       executionId,
       cpuTime || null,
-      ioWaitTime || null,
-      lockWaitTime || null,
-      rowsRead || null,
-      rowsWritten || null,
-      tempStorageUsed || null,
-      sortOperations || null,
-      indexScans || null,
-      tableScans || null,
+      ioOperations || null,
+      logicalReads || null,
+      physicalReads || null,
+      tempStorageKb || null,
+      estimatedCost || null,
+      actualRows || null,
     ]);
-    
+
     return {
       executionId,
       ...metricsData,
@@ -85,16 +81,13 @@ async function findByExecutionId(executionId) {
     const sql = `
       SELECT 
         EXECUTION_ID,
-        CPU_TIME,
-        IO_WAIT_TIME,
-        LOCK_WAIT_TIME,
-        ROWS_READ,
-        ROWS_WRITTEN,
-        TEMP_STORAGE_USED,
-        SORT_OPERATIONS,
-        INDEX_SCANS,
-        TABLE_SCANS,
-        COLLECTED_AT
+        CPU_TIME_MS AS CPU_TIME,
+        IO_OPERATIONS AS IO_OPERATIONS,
+        LOGICAL_READS AS LOGICAL_READS,
+        PHYSICAL_READS AS PHYSICAL_READS,
+        TEMP_STORAGE_KB AS TEMP_STORAGE_KB,
+        ESTIMATED_COST AS ESTIMATED_COST,
+        ACTUAL_ROWS AS ACTUAL_ROWS
       FROM ${getTableName('QRYRUN_METRICS')}
       WHERE EXECUTION_ID = ?
     `;
@@ -123,20 +116,18 @@ async function getQueryAggregatedMetrics(runId, queryId) {
     const sql = `
       SELECT 
         COUNT(*) AS METRIC_COUNT,
-        AVG(m.CPU_TIME) AS AVG_CPU_TIME,
-        MIN(m.CPU_TIME) AS MIN_CPU_TIME,
-        MAX(m.CPU_TIME) AS MAX_CPU_TIME,
-        AVG(m.IO_WAIT_TIME) AS AVG_IO_WAIT_TIME,
-        AVG(m.LOCK_WAIT_TIME) AS AVG_LOCK_WAIT_TIME,
-        AVG(m.ROWS_READ) AS AVG_ROWS_READ,
-        AVG(m.ROWS_WRITTEN) AS AVG_ROWS_WRITTEN,
-        AVG(m.TEMP_STORAGE_USED) AS AVG_TEMP_STORAGE_USED,
-        SUM(m.SORT_OPERATIONS) AS TOTAL_SORT_OPERATIONS,
-        SUM(m.INDEX_SCANS) AS TOTAL_INDEX_SCANS,
-        SUM(m.TABLE_SCANS) AS TOTAL_TABLE_SCANS
+        AVG(m.CPU_TIME_MS) AS AVG_CPU_TIME,
+        MIN(m.CPU_TIME_MS) AS MIN_CPU_TIME,
+        MAX(m.CPU_TIME_MS) AS MAX_CPU_TIME,
+        AVG(m.IO_OPERATIONS) AS AVG_IO_OPERATIONS,
+        AVG(m.LOGICAL_READS) AS AVG_LOGICAL_READS,
+        AVG(m.PHYSICAL_READS) AS AVG_PHYSICAL_READS,
+        AVG(m.TEMP_STORAGE_KB) AS AVG_TEMP_STORAGE_KB,
+        SUM(m.ESTIMATED_COST) AS TOTAL_ESTIMATED_COST,
+        SUM(m.ACTUAL_ROWS) AS TOTAL_ACTUAL_ROWS
       FROM ${getTableName('QRYRUN_METRICS')} m
       JOIN ${getTableName('QRYRUN_EXECUTIONS')} e ON m.EXECUTION_ID = e.EXECUTION_ID
-      WHERE e.RUN_ID = ? AND e.QUERY_ID = ? AND e.STATUS = 'COMPLETED'
+      WHERE e.RUN_ID = ? AND e.QUERY_ID = ? AND e.STATUS = 'SUCCESS'
     `;
     
     const results = await query(sql, [runId, queryId]);
@@ -162,21 +153,19 @@ async function getRunAggregatedMetrics(runId) {
     const sql = `
       SELECT 
         COUNT(*) AS METRIC_COUNT,
-        AVG(m.CPU_TIME) AS AVG_CPU_TIME,
-        SUM(m.CPU_TIME) AS TOTAL_CPU_TIME,
-        AVG(m.IO_WAIT_TIME) AS AVG_IO_WAIT_TIME,
-        SUM(m.IO_WAIT_TIME) AS TOTAL_IO_WAIT_TIME,
-        AVG(m.LOCK_WAIT_TIME) AS AVG_LOCK_WAIT_TIME,
-        SUM(m.LOCK_WAIT_TIME) AS TOTAL_LOCK_WAIT_TIME,
-        SUM(m.ROWS_READ) AS TOTAL_ROWS_READ,
-        SUM(m.ROWS_WRITTEN) AS TOTAL_ROWS_WRITTEN,
-        SUM(m.TEMP_STORAGE_USED) AS TOTAL_TEMP_STORAGE_USED,
-        SUM(m.SORT_OPERATIONS) AS TOTAL_SORT_OPERATIONS,
-        SUM(m.INDEX_SCANS) AS TOTAL_INDEX_SCANS,
-        SUM(m.TABLE_SCANS) AS TOTAL_TABLE_SCANS
+        AVG(m.CPU_TIME_MS) AS AVG_CPU_TIME,
+        SUM(m.CPU_TIME_MS) AS TOTAL_CPU_TIME,
+        AVG(m.IO_OPERATIONS) AS AVG_IO_OPERATIONS,
+        SUM(m.IO_OPERATIONS) AS TOTAL_IO_OPERATIONS,
+        AVG(m.LOGICAL_READS) AS AVG_LOGICAL_READS,
+        SUM(m.LOGICAL_READS) AS TOTAL_LOGICAL_READS,
+        SUM(m.PHYSICAL_READS) AS TOTAL_PHYSICAL_READS,
+        SUM(m.TEMP_STORAGE_KB) AS TOTAL_TEMP_STORAGE_KB,
+        SUM(m.ESTIMATED_COST) AS TOTAL_ESTIMATED_COST,
+        SUM(m.ACTUAL_ROWS) AS TOTAL_ACTUAL_ROWS
       FROM ${getTableName('QRYRUN_METRICS')} m
       JOIN ${getTableName('QRYRUN_EXECUTIONS')} e ON m.EXECUTION_ID = e.EXECUTION_ID
-      WHERE e.RUN_ID = ? AND e.STATUS = 'COMPLETED'
+      WHERE e.RUN_ID = ? AND e.STATUS = 'SUCCESS'
     `;
     
     const results = await query(sql, [runId]);
@@ -203,21 +192,18 @@ async function getQueryMetrics(runId, queryId) {
     const sql = `
       SELECT 
         m.EXECUTION_ID,
-        e.ITERATION_NUMBER,
-        m.CPU_TIME,
-        m.IO_WAIT_TIME,
-        m.LOCK_WAIT_TIME,
-        m.ROWS_READ,
-        m.ROWS_WRITTEN,
-        m.TEMP_STORAGE_USED,
-        m.SORT_OPERATIONS,
-        m.INDEX_SCANS,
-        m.TABLE_SCANS,
-        m.COLLECTED_AT
+        e.ITERATION_NUM AS ITERATION_NUMBER,
+        m.CPU_TIME_MS AS CPU_TIME,
+        m.IO_OPERATIONS AS IO_OPERATIONS,
+        m.LOGICAL_READS AS LOGICAL_READS,
+        m.PHYSICAL_READS AS PHYSICAL_READS,
+        m.TEMP_STORAGE_KB AS TEMP_STORAGE_KB,
+        m.ESTIMATED_COST AS ESTIMATED_COST,
+        m.ACTUAL_ROWS AS ACTUAL_ROWS
       FROM ${getTableName('QRYRUN_METRICS')} m
       JOIN ${getTableName('QRYRUN_EXECUTIONS')} e ON m.EXECUTION_ID = e.EXECUTION_ID
       WHERE e.RUN_ID = ? AND e.QUERY_ID = ?
-      ORDER BY e.ITERATION_NUMBER
+      ORDER BY e.ITERATION_NUM
     `;
     
     return await query(sql, [runId, queryId]);
@@ -255,12 +241,14 @@ async function compareExecutions(executionId1, executionId2) {
       execution1: metrics1,
       execution2: metrics2,
       differences: {
-        cpuTimeDiff: metrics2.CPU_TIME - metrics1.CPU_TIME,
-        cpuTimePercent: ((metrics2.CPU_TIME - metrics1.CPU_TIME) / metrics1.CPU_TIME) * 100,
-        ioWaitTimeDiff: metrics2.IO_WAIT_TIME - metrics1.IO_WAIT_TIME,
-        lockWaitTimeDiff: metrics2.LOCK_WAIT_TIME - metrics1.LOCK_WAIT_TIME,
-        rowsReadDiff: metrics2.ROWS_READ - metrics1.ROWS_READ,
-        rowsWrittenDiff: metrics2.ROWS_WRITTEN - metrics1.ROWS_WRITTEN,
+        cpuTimeDiff: (metrics2.CPU_TIME || 0) - (metrics1.CPU_TIME || 0),
+        cpuTimePercent: (metrics1.CPU_TIME && metrics1.CPU_TIME !== 0)
+          ? (((metrics2.CPU_TIME || 0) - (metrics1.CPU_TIME || 0)) / metrics1.CPU_TIME) * 100
+          : null,
+        ioOperationsDiff: (metrics2.IO_OPERATIONS || 0) - (metrics1.IO_OPERATIONS || 0),
+        logicalReadsDiff: (metrics2.LOGICAL_READS || 0) - (metrics1.LOGICAL_READS || 0),
+        physicalReadsDiff: (metrics2.PHYSICAL_READS || 0) - (metrics1.PHYSICAL_READS || 0),
+        actualRowsDiff: (metrics2.ACTUAL_ROWS || 0) - (metrics1.ACTUAL_ROWS || 0),
       },
     };
     
