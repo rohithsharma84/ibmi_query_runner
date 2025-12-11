@@ -28,14 +28,19 @@ const consoleFormat = winston.format.combine(
   })
 );
 
+// Determine effective log level and whether debug is enabled
+const effectiveLogLevel = (appConfig.logLevel || process.env.LOG_LEVEL || 'info').toLowerCase();
+const isDebugEnabled = ['debug', 'silly', 'verbose'].includes(effectiveLogLevel);
+
 // Create logger instance
 const logger = winston.createLogger({
-  level: appConfig.logLevel,
+  level: effectiveLogLevel,
   format: logFormat,
   defaultMeta: { service: 'ibmi-query-runner' },
   transports: [
-    // Write all logs to console
+    // Write logs to console (respect configured level)
     new winston.transports.Console({
+      level: effectiveLogLevel,
       format: consoleFormat,
     }),
     // Write all logs with level 'error' and below to error.log
@@ -45,14 +50,18 @@ const logger = winston.createLogger({
       maxsize: 5242880, // 5MB
       maxFiles: 5,
     }),
-    // Write all logs to combined.log
+    // Write logs to combined.log at configured level
     new winston.transports.File({
       filename: path.join(appConfig.logsPath, 'combined.log'),
+      level: effectiveLogLevel,
       maxsize: 5242880, // 5MB
       maxFiles: 5,
     }),
   ],
 });
+
+// Expose whether debug-level logging is enabled
+logger.isDebugEnabled = isDebugEnabled;
 
 // Create a stream object for Morgan HTTP logger
 logger.stream = {

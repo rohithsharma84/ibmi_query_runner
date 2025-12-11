@@ -157,8 +157,9 @@ async function findById(setId) {
       FROM ${getTableName('QRYRUN_QUERY_SETS')}
       WHERE SET_ID = ? AND IS_ACTIVE = 'Y'
     `;
-    
-    const results = await query(sql, [setId]);
+  logger.debug('QuerySet.findById SQL', { sql: sql.replace(/\s+/g, ' ').trim(), setId });
+  const results = await query(sql, [setId]);
+  logger.debug('QuerySet.findById result count', { setId, count: Array.isArray(results) ? results.length : 0 });
     return results.length > 0 ? results[0] : null;
     
   } catch (error) {
