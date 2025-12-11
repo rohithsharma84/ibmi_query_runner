@@ -419,8 +419,8 @@ async function createFromPlanCache() {
       limit: form.value.limit || 100
     }
 
-    const response = await querySetsAPI.createFromPlanCache(data)
-    const setId = response.data.setId
+  const response = await querySetsAPI.createFromPlanCache(data)
+  const setId = response.data.querySet?.setId || response.data.setId
 
     // Redirect to query set detail page
     router.push(`/query-sets/${setId}`)
@@ -447,8 +447,8 @@ async function createManual() {
     const userProfile = authStore.user?.user_profile || authStore.user?.userId || undefined
     if (userProfile) data.userProfile = String(userProfile).trim()
 
-    const response = await querySetsAPI.createManual(data)
-    const setId = response.data.setId
+  const response = await querySetsAPI.createManual(data)
+  const setId = response.data.querySet?.setId || response.data.setId
 
     // Redirect to query set detail page
     router.push(`/query-sets/${setId}`)

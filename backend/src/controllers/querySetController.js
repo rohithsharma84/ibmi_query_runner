@@ -165,14 +165,32 @@ async function getAll(req, res, next) {
  */
 async function getById(req, res, next) {
   try {
-    const { setId } = req.params;
+    let { setId } = req.params;
+    // Validate setId is provided and is a number
+    if (!setId) {
+      throw new ApiError(
+        HTTP_STATUS.BAD_REQUEST,
+        'setId parameter is required',
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+    // Try to coerce to integer ID when possible
+    const numericId = Number(setId);
+    if (!Number.isFinite(numericId)) {
+      throw new ApiError(
+        HTTP_STATUS.BAD_REQUEST,
+        'setId must be a numeric ID',
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+    setId = numericId;
     
     logger.info('Getting query set:', {
       userId: req.user.userId,
       setId,
     });
     
-    const querySet = await querySetService.getById(setId);
+  const querySet = await querySetService.getById(setId);
     
     res.status(HTTP_STATUS.OK).json({
       success: true,
@@ -190,7 +208,23 @@ async function getById(req, res, next) {
  */
 async function update(req, res, next) {
   try {
-    const { setId } = req.params;
+    let { setId } = req.params;
+    if (!setId) {
+      throw new ApiError(
+        HTTP_STATUS.BAD_REQUEST,
+        'setId parameter is required',
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+    const numericId = Number(setId);
+    if (!Number.isFinite(numericId)) {
+      throw new ApiError(
+        HTTP_STATUS.BAD_REQUEST,
+        'setId must be a numeric ID',
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+    setId = numericId;
     const updates = {};
     
     if (req.body.setName !== undefined) {
@@ -215,7 +249,7 @@ async function update(req, res, next) {
       updates,
     });
     
-    const querySet = await querySetService.update(setId, updates);
+  const querySet = await querySetService.update(setId, updates);
     
     res.status(HTTP_STATUS.OK).json({
       success: true,
@@ -232,14 +266,30 @@ async function update(req, res, next) {
  */
 async function remove(req, res, next) {
   try {
-    const { setId } = req.params;
+    let { setId } = req.params;
+    if (!setId) {
+      throw new ApiError(
+        HTTP_STATUS.BAD_REQUEST,
+        'setId parameter is required',
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+    const numericId = Number(setId);
+    if (!Number.isFinite(numericId)) {
+      throw new ApiError(
+        HTTP_STATUS.BAD_REQUEST,
+        'setId must be a numeric ID',
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+    setId = numericId;
     
     logger.info('Deleting query set:', {
       userId: req.user.userId,
       setId,
     });
     
-    await querySetService.remove(setId);
+  await querySetService.remove(setId);
     
     res.status(HTTP_STATUS.OK).json({
       success: true,
