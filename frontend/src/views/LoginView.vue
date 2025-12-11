@@ -136,7 +136,8 @@ function handleInput() {
 
 async function handleLogin() {
   const result = await authStore.login({
-    userProfile: form.value.userProfile.trim(),
+    // backend expects `userId` — map the frontend userProfile to userId
+    userId: form.value.userProfile.trim(),
     password: form.value.password
   })
 
