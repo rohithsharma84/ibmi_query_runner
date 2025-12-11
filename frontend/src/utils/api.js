@@ -92,26 +92,51 @@ function normalizeQuerySet(qs) {
 
   const normalized = {}
 
-  // Map known DB columns to frontend keys
-  normalized.set_id = qs.SET_ID || qs.Set_Id || qs.setId || qs.set_id || qs.SET_ID
-  normalized.set_name = qs.SET_NAME || qs.SET_NAME || qs.set_name || qs.SET_NAME
-  normalized.description = qs.SET_DESCRIPTION || qs.DESCRIPTION || qs.description
-  normalized.user_profile = qs.SOURCE_USER_PROFILE || qs.USER_PROFILE || qs.user_profile
-  normalized.created_by = qs.CREATED_BY || qs.created_by
-  normalized.created_at = qs.CREATED_AT || qs.created_at
-  normalized.last_refreshed_at = qs.LAST_REFRESHED || qs.LAST_REFRESHED_AT || qs.last_refreshed_at
-  normalized.query_count = qs.QUERY_COUNT || qs.query_count || 0
+  // Prefer canonical DB/response values (uppercase), then common variants
+  const id = qs.SET_ID ?? qs.Set_Id ?? qs.setId ?? qs.set_id ?? qs.id
+  const name = qs.SET_NAME ?? qs.set_name ?? qs.setName ?? qs.name
+  const description = qs.SET_DESCRIPTION ?? qs.DESCRIPTION ?? qs.description
+  const userProfile = qs.SOURCE_USER_PROFILE ?? qs.USER_PROFILE ?? qs.user_profile ?? qs.userProfile
+  const createdBy = qs.CREATED_BY ?? qs.created_by ?? qs.createdBy
+  const createdAt = qs.CREATED_AT ?? qs.created_at ?? qs.createdAt
+  const lastRefreshed = qs.LAST_REFRESHED ?? qs.LAST_REFRESHED_AT ?? qs.last_refreshed_at ?? qs.last_refreshed
+  const queryCount = qs.QUERY_COUNT ?? qs.query_count ?? qs.queryCount ?? 0
 
-  // Preserve other useful fields if present
-  if (qs.QUERY_COUNT === undefined && qs.query_count !== undefined) normalized.query_count = qs.query_count
-  if (qs.SET_NAME === undefined && qs.set_name !== undefined) normalized.set_name = qs.set_name
+  // Provide both snake_case and camelCase keys so different views/components can use either
+  normalized.set_id = id
+  normalized.setId = id
 
-  // Copy any other properties through (but avoid overwriting mapped keys)
+  normalized.set_name = name
+  normalized.setName = name
+
+  normalized.description = description
+
+  normalized.user_profile = userProfile
+  normalized.userProfile = userProfile
+
+  normalized.created_by = createdBy
+  normalized.createdBy = createdBy
+
+  normalized.created_at = createdAt
+  normalized.createdAt = createdAt
+
+  normalized.last_refreshed_at = lastRefreshed
+  normalized.lastRefreshedAt = lastRefreshed
+
+  normalized.query_count = queryCount
+  normalized.queryCount = queryCount
+
+  // Copy other properties to lowercase/camel keys as fallbacks, without overwriting
   Object.keys(qs).forEach(k => {
-    const lk = k.toLowerCase()
-    if (!Object.values(normalized).includes(qs[k]) && !normalized.hasOwnProperty(lk)) {
-      // only set if not already mapped
-      normalized[lk] = qs[k]
+    const lower = k.toLowerCase()
+    if (!normalized.hasOwnProperty(lower)) {
+      // map the original value to a lowercase key if not present
+      normalized[lower] = qs[k]
+    }
+    // also provide camelCase version for convenience if it looks like a compound key
+    const camel = lower.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+    if (!normalized.hasOwnProperty(camel)) {
+      normalized[camel] = qs[k]
     }
   })
 
