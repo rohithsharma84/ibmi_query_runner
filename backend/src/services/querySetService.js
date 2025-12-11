@@ -61,14 +61,17 @@ async function createFromPlanCache(setData, planCacheFilters) {
  */
 async function createManual(setData, queries) {
   try {
-    if (!queries || queries.length === 0) {
+    // Allow creating an empty query set. If queries is undefined, default to empty array.
+    if (queries === undefined) {
+      queries = [];
+    } else if (!Array.isArray(queries)) {
       throw new ApiError(
         HTTP_STATUS.BAD_REQUEST,
-        'At least one query is required',
+        'queries must be an array',
         ERROR_CODES.VALIDATION_ERROR
       );
     }
-    
+
     const querySet = await QuerySet.create(setData, queries);
     
     logger.info('Query set created manually:', {
