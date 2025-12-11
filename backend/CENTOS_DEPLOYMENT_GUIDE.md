@@ -245,7 +245,13 @@ server {
     root /home/ibmiapp/ibmi_query_runner/frontend/dist;
     index index.html;
     
-    # Frontend routes
+    # Serve index.html directly (prevents internal redirect loop)
+    location = /index.html {
+        # Serve the file directly and return 404 if missing
+        try_files $uri =404;
+    }
+
+    # Frontend routes (SPA)
     location / {
         try_files $uri $uri/ /index.html;
     }
