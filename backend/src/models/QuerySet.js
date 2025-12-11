@@ -52,6 +52,13 @@ async function create(setData, queries = []) {
       const idRes = await conn.execute("SELECT IDENTITY_VAL_LOCAL() AS SET_ID FROM SYSIBM.SYSDUMMY1");
       // Debug: log raw identity result to diagnose driver behavior
       logger.debug('QuerySet.create identity raw result', { idRes });
+      // Dump the keys returned by the driver result (debug-only)
+      try {
+        const idResKeys = Object.keys(idRes || {});
+        logger.debug('QuerySet.create identity keys', { idResKeys });
+      } catch (keyErr) {
+        logger.debug('QuerySet.create identity keys error', { error: keyErr.message });
+      }
 
       // node-jt400 / driver may return column keys in different cases or shapes; handle several variants
       let setId = null;
@@ -72,6 +79,13 @@ async function create(setData, queries = []) {
           const fallbackSql = `SELECT SET_ID FROM ${getTableName('QRYRUN_QUERY_SETS')} WHERE SET_NAME = ? AND CREATED_BY = ? ORDER BY CREATED_AT DESC FETCH FIRST 1 ROWS ONLY`;
           const fallbackRes = await conn.execute(fallbackSql, [setName, createdBy.toUpperCase()]);
           logger.debug('QuerySet.create fallback raw result', { fallbackRes });
+          // Dump the keys returned by the fallback result (debug-only)
+          try {
+            const fallbackKeys = Object.keys(fallbackRes || {});
+            logger.debug('QuerySet.create fallback keys', { fallbackKeys });
+          } catch (fkErr) {
+            logger.debug('QuerySet.create fallback keys error', { error: fkErr.message });
+          }
           if (fallbackRes && fallbackRes.length > 0) {
             const r = fallbackRes[0];
             logger.debug('QuerySet.create fallback row', { fallbackRow: r });
