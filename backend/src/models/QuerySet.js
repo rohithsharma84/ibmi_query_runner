@@ -23,19 +23,27 @@ async function create(setData, queries = []) {
   const conn = await transaction();
   
   try {
-      const { setName, description, userProfile, createdBy } = setData;
+      const { setName, description, userProfile, createdBy, importDateFrom, importDateTo, planCacheView, additionalFilters } = setData;
+
+      // Use a sensible default for planCacheView if not provided
+      const { PLAN_CACHE_VIEWS } = require('../config/constants');
+      const effectiveView = planCacheView || PLAN_CACHE_VIEWS.PLAN_CACHE_INFO;
 
       // Insert query set (SET_ID is an IDENTITY column, let the DB generate it)
       const insertSetSql = `
         INSERT INTO ${getTableName('QRYRUN_QUERY_SETS')}
-        (SET_NAME, SET_DESCRIPTION, SOURCE_USER_PROFILE, CREATED_BY, CREATED_AT, IS_ACTIVE, QUERY_COUNT)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 'Y', 0)
+        (SET_NAME, SET_DESCRIPTION, SOURCE_USER_PROFILE, IMPORT_DATE_FROM, IMPORT_DATE_TO, PLAN_CACHE_VIEW, ADDITIONAL_FILTERS, CREATED_BY, CREATED_AT, IS_ACTIVE, QUERY_COUNT)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'Y', 0)
       `;
 
       await conn.execute(insertSetSql, [
         setName,
         description || null,
         userProfile.toUpperCase(),
+        importDateFrom || null,
+        importDateTo || null,
+        effectiveView,
+        additionalFilters || null,
         createdBy.toUpperCase(),
       ]);
 
@@ -58,6 +66,10 @@ async function create(setData, queries = []) {
       description,
       userProfile: userProfile.toUpperCase(),
       createdBy: createdBy.toUpperCase(),
+      importDateFrom: importDateFrom || null,
+      importDateTo: importDateTo || null,
+      planCacheView: effectiveView,
+      additionalFilters: additionalFilters || null,
       queryCount: queries.length,
     };
     
@@ -199,8 +211,8 @@ async function findAll(filters = {}) {
     }
     
     sql += `
-      GROUP BY qs.SET_ID, qs.SET_NAME, qs.DESCRIPTION, qs.USER_PROFILE, 
-               qs.CREATED_BY, qs.CREATED_AT, qs.LAST_REFRESHED_AT
+      GROUP BY qs.SET_ID, qs.SET_NAME, qs.SET_DESCRIPTION, qs.SOURCE_USER_PROFILE, 
+               qs.CREATED_BY, qs.CREATED_AT, qs.LAST_REFRESHED
       ORDER BY qs.CREATED_AT DESC
     `;
     
