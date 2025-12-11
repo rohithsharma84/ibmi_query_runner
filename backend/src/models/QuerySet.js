@@ -50,11 +50,15 @@ async function create(setData, queries = []) {
 
       // Retrieve the generated SET_ID (IDENTITY) on the same connection
       const idRes = await conn.execute("SELECT IDENTITY_VAL_LOCAL() AS SET_ID FROM SYSIBM.SYSDUMMY1");
+      // Debug: log raw identity result to diagnose driver behavior
+      logger.debug('QuerySet.create identity raw result', { idRes });
+
       // node-jt400 / driver may return column keys in different cases or shapes; handle several variants
       let setId = null;
       if (idRes && idRes.length > 0) {
         const idRow = idRes[0];
-        setId = idRow.SET_ID ?? idRow.Set_Id ?? idRow.set_id ?? idRow['IDENTITY_VAL_LOCAL()'] ?? idRow.IDENTITY_VAL_LOCAL ?? idRow.ID;
+        logger.debug('QuerySet.create identity row', { idRow });
+        setId = idRow.SET_ID ?? idRow.Set_Id ?? idRow.set_id ?? idRow['IDENTITY_VAL_LOCAL()'] ?? idRow.IDENTITY_VAL_LOCAL ?? idRow.ID ?? idRow[Object.keys(idRow)[0]];
         if (setId !== null && setId !== undefined) {
           // coerce to number when possible
           const numeric = Number(setId);
@@ -67,9 +71,11 @@ async function create(setData, queries = []) {
         try {
           const fallbackSql = `SELECT SET_ID FROM ${getTableName('QRYRUN_QUERY_SETS')} WHERE SET_NAME = ? AND CREATED_BY = ? ORDER BY CREATED_AT DESC FETCH FIRST 1 ROWS ONLY`;
           const fallbackRes = await conn.execute(fallbackSql, [setName, createdBy.toUpperCase()]);
+          logger.debug('QuerySet.create fallback raw result', { fallbackRes });
           if (fallbackRes && fallbackRes.length > 0) {
             const r = fallbackRes[0];
-            setId = r.SET_ID ?? r.set_id ?? r.Set_Id ?? r.ID ?? null;
+            logger.debug('QuerySet.create fallback row', { fallbackRow: r });
+            setId = r.SET_ID ?? r.set_id ?? r.Set_Id ?? r.ID ?? r[Object.keys(r)[0]] ?? null;
             const numeric = Number(setId);
             setId = Number.isFinite(numeric) ? numeric : setId;
           }
