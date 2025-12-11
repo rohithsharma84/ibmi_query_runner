@@ -146,14 +146,14 @@ async function findById(setId) {
   try {
     const sql = `
       SELECT 
-        SET_ID AS set_id,
-        SET_NAME AS set_name,
+        SET_ID ,
+        SET_NAME,
         SET_DESCRIPTION AS description,
         SOURCE_USER_PROFILE AS user_profile,
-        CREATED_BY AS created_by,
-        CREATED_AT AS created_at,
+        CREATED_BY ,
+        CREATED_AT ,
         LAST_REFRESHED AS last_refreshed_at,
-        IS_ACTIVE AS is_active
+        IS_ACTIVE 
       FROM ${getTableName('QRYRUN_QUERY_SETS')}
       WHERE SET_ID = ? AND IS_ACTIVE = 'Y'
     `;
@@ -183,13 +183,13 @@ async function findAll(filters = {}) {
   try {
     let sql = `
       SELECT 
-        qs.SET_ID AS set_id,
-        qs.SET_NAME AS set_name,
-        qs.SET_DESCRIPTION AS description,
-        qs.SOURCE_USER_PROFILE AS user_profile,
-        qs.CREATED_BY AS created_by,
-        qs.CREATED_AT AS created_at,
-        qs.LAST_REFRESHED AS last_refreshed_at,
+        qs.SET_ID,
+        qs.SET_NAME,
+        qs.SET_DESCRIPTION,
+        qs.SOURCE_USER_PROFILE,
+        qs.CREATED_BY,
+        qs.CREATED_AT,
+        qs.LAST_REFRESHED,
         COUNT(q.QUERY_ID) AS query_count
       FROM ${getTableName('QRYRUN_QUERY_SETS')} qs
       LEFT JOIN ${getTableName('QRYRUN_QUERIES')} q 
@@ -241,7 +241,7 @@ async function getQueries(setId) {
         QUERY_TEXT,
         QUERY_HASH,
         SEQUENCE_NUM AS SEQUENCE_NUMBER,
-        QUERY_NAME AS QUERY_NAME,
+        QUERY_NAME,
         SOURCE_USER AS ORIGINAL_USER,
         0 AS ORIGINAL_RUN_COUNT,
         ADDED_AT
