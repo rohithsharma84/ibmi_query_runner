@@ -335,11 +335,13 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { planCacheAPI, querySetsAPI } from '@/utils/api'
 import { formatDate, formatDuration, formatNumber, formatSQL } from '@/utils/formatters'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 const creationMethod = ref(null)
 const previewing = ref(false)
@@ -440,6 +442,10 @@ async function createManual() {
       setName: manualForm.value.setName.trim(),
       description: manualForm.value.description.trim() || undefined
     }
+
+    // Ensure backend receives the creating user's IBM i profile
+    const userProfile = authStore.user?.user_profile || authStore.user?.userId || undefined
+    if (userProfile) data.userProfile = String(userProfile).trim()
 
     const response = await querySetsAPI.createManual(data)
     const setId = response.data.setId
