@@ -9,20 +9,18 @@ import { initAuthSession } from '@/utils/api'
 const app = createApp(App)
 const pinia = createPinia()
 app.use(pinia)
+app.use(router)
+app.mount('#app')
 
-// Bootstrap auth before mounting to prevent redirect on hard refresh
+// After mount, hydrate token + session (guards tolerate token presence)
 (async () => {
 	const auth = useAuthStore()
-	// hydrate token from localStorage and validate session
 	try {
 		const session = await initAuthSession()
 		if (session?.authenticated && session?.user && auth?.setUser) {
 			auth.setUser(session.user)
 		}
-	} catch (e) {
-		// ignore bootstrap errors; router guard will handle unauthenticated state
+	} catch {
+		// ignore
 	}
-
-	app.use(router)
-	app.mount('#app')
 })()
