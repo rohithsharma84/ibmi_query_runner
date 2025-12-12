@@ -174,6 +174,7 @@ async function deleteUser(req, res) {
     success: true,
     message: 'User deleted successfully',
   });
+}
 /**
  * PUT /api/users/:userId
  * Update user (admin only)
@@ -227,7 +228,6 @@ async function updateUser(req, res) {
   });
 }
 
-}
 
 module.exports = {
   getAllUsers,
