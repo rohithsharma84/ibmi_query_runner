@@ -40,7 +40,8 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Token expired or invalid: clear persisted token and redirect
       try { localStorage.removeItem('token') } catch {}
-      authStore.logout()
+      // Clear locally to avoid calling backend logout without a token
+      if (authStore?.clearSession) authStore.clearSession()
       // Optional: avoid redirect loops; only redirect on explicit auth endpoints or first load
       if (window.location.pathname !== '/login') {
         window.location.href = '/login'

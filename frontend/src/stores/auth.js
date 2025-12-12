@@ -40,7 +40,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     try {
-      await authAPI.logout()
+      // Only call backend logout if we have a token to send
+      if (token.value) {
+        await authAPI.logout()
+      }
     } catch (err) {
       console.error('Logout error:', err)
     } finally {
@@ -49,6 +52,13 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = null
       localStorage.removeItem('token')
     }
+  }
+
+  // Clear session locally without contacting backend (for 401 handlers)
+  function clearSession() {
+    token.value = null
+    user.value = null
+    try { localStorage.removeItem('token') } catch {}
   }
 
   async function checkSession() {
@@ -97,6 +107,7 @@ export const useAuthStore = defineStore('auth', () => {
     checkSession,
     clearError,
     setToken,
-    setUser
+    setUser,
+    clearSession
   }
 })
