@@ -237,8 +237,14 @@ const addUser = async () => {
       success.value = ''
     }, 3000)
   } catch (err) {
+    const status = err.response?.status
     const msg = err.response?.data?.error?.message || err.response?.data?.error || ''
     const code = err.response?.data?.error?.code
+    // Duplicate user: show graceful message
+    if (status === 409 || code === 'DUPLICATE_ENTRY' || /already exists/i.test(msg)) {
+      error.value = `User ${formData.value.user_profile} already exists`
+      return
+    }
     // If validation error due to existence/permission, offer bypass
     if (code === 'VALIDATION_ERROR' && /does not exist|permission to verify/i.test(msg)) {
       const proceed = window.confirm('Either the IBM i user does not exist or you do not have permissions to verify the user. Do you want to add the user anyway?')
@@ -257,6 +263,13 @@ const addUser = async () => {
           setTimeout(() => { success.value = '' }, 3000)
           return
         } catch (e2) {
+          const s2 = e2.response?.status
+          const m2 = e2.response?.data?.error?.message || e2.response?.data?.error || ''
+          const c2 = e2.response?.data?.error?.code
+          if (s2 === 409 || c2 === 'DUPLICATE_ENTRY' || /already exists/i.test(m2)) {
+            error.value = `User ${formData.value.user_profile} already exists`
+            return
+          }
           error.value = e2.response?.data?.error || 'Failed to add user'
         }
       } else {
