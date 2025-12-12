@@ -3,7 +3,7 @@
  * Database operations for user management
  */
 
-const { query, getTableName } = require('../config/database');
+const { query, getTableName, transaction } = require('../config/database');
 const { ApiError } = require('../middleware/errorHandler');
 const { HTTP_STATUS, ERROR_CODES } = require('../config/constants');
 const logger = require('../utils/logger');
@@ -68,35 +68,48 @@ async function findAll() {
 async function create(userData) {
   try {
     const { userId, userName, email, isAdmin } = userData;
-    
-    // Check if user already exists
-    const existing = await findById(userId);
-    if (existing) {
-      throw new ApiError(
-        HTTP_STATUS.CONFLICT,
-        'User already exists',
-        ERROR_CODES.DUPLICATE_ENTRY
-      );
-    }
-    
-    const sql = `
-      INSERT INTO ${getTableName('QRYRUN_USERS')} 
-        (USER_ID, USER_NAME, EMAIL, IS_ADMIN)
-      VALUES (?, ?, ?, ?)
-    `;
-    
-    await query(sql, [
-      userId.toUpperCase(),
-      userName,
-      email,
-      isAdmin ? 'Y' : 'N'
-    ]);
-    
+
+    const created = await transaction(async (conn) => {
+      // Check if user already exists using same connection
+      const checkSql = `
+        SELECT USER_ID FROM ${getTableName('QRYRUN_USERS')} WHERE USER_ID = ?
+      `;
+      const existingRows = await conn.execute(checkSql, [userId.toUpperCase()]);
+      if (Array.isArray(existingRows) && existingRows.length > 0) {
+        throw new ApiError(
+          HTTP_STATUS.CONFLICT,
+          'User already exists',
+          ERROR_CODES.DUPLICATE_ENTRY
+        );
+      }
+
+      const insertSql = `
+        INSERT INTO ${getTableName('QRYRUN_USERS')} 
+          (USER_ID, USER_NAME, EMAIL, IS_ADMIN, CREATED_AT)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `;
+
+      await conn.execute(insertSql, [
+        userId.toUpperCase(),
+        userName,
+        email,
+        isAdmin ? 'Y' : 'N'
+      ]);
+
+      // Return newly created user
+      const selectSql = `
+        SELECT USER_ID, USER_NAME, EMAIL, IS_ADMIN, CREATED_AT, LAST_LOGIN
+        FROM ${getTableName('QRYRUN_USERS')}
+        WHERE USER_ID = ?
+      `;
+      const rows = await conn.execute(selectSql, [userId.toUpperCase()]);
+      return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    });
+
     logger.info('User created:', { userId });
-    return await findById(userId);
+    return created;
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    
     logger.error('Error creating user:', error);
     throw new ApiError(
       HTTP_STATUS.INTERNAL_SERVER_ERROR,
