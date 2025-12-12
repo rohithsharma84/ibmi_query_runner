@@ -18,52 +18,63 @@ const logger = require('../utils/logger');
  * @returns {Promise<Object>} Created comparison
  */
 async function create(comparisonData) {
-  const conn = await transaction();
-  
   try {
     const { baselineRunId, comparisonRunId, deviationThreshold, createdBy } = comparisonData;
-    
-    // Insert comparison record (COMPARISON_ID is IDENTITY)
-    const sql = `
-      INSERT INTO ${getTableName('QRYRUN_COMPARISONS')}
-      (BASELINE_RUN_ID, COMPARISON_RUN_ID, DEVIATION_THRESHOLD, CREATED_BY, CREATED_AT)
-      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `;
 
-    await conn.execute(sql, [
-      baselineRunId,
-      comparisonRunId,
-      deviationThreshold,
-      createdBy.toUpperCase(),
-    ]);
+    const result = await transaction(async (conn) => {
+      // Use FINAL TABLE INSERT to reliably get identity
+      const insertSelectSql = `
+        SELECT COMPARISON_ID
+          FROM FINAL TABLE (
+            INSERT INTO ${getTableName('QRYRUN_COMPARISONS')}
+              (BASELINE_RUN_ID, COMPARISON_RUN_ID, DEVIATION_THRESHOLD, CREATED_BY, CREATED_AT)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+          )
+      `;
 
-    // get generated id
-    const idRes = await conn.execute("SELECT IDENTITY_VAL_LOCAL() AS COMPARISON_ID FROM SYSIBM.SYSDUMMY1");
-    let comparisonId = null;
-    if (idRes && idRes.length > 0) {
-      // some drivers return array of results
-      const row = Array.isArray(idRes) ? idRes[0] : idRes;
-      comparisonId = row.COMPARISON_ID || (row[0] && row[0].COMPARISON_ID) || null;
-    }
+      let rows = await conn.execute(insertSelectSql, [
+        baselineRunId,
+        comparisonRunId,
+        deviationThreshold,
+        createdBy.toUpperCase(),
+      ]);
 
-    await conn.commit();
+      // Materialize jt400 results if a handle is returned
+      try {
+        if (rows && typeof rows.asArray === 'function') {
+          rows = await rows.asArray();
+        } else if (rows && typeof rows.asObjectStream === 'function') {
+          const arr = [];
+          for await (const obj of rows.asObjectStream()) arr.push(obj);
+          rows = arr;
+        }
+      } catch {}
+
+      let comparisonId = null;
+      if (Array.isArray(rows) && rows.length > 0) {
+        const r = rows[0];
+        comparisonId = r.COMPARISON_ID ?? r.comparison_id ?? r.Id ?? r[Object.keys(r)[0]] ?? null;
+        const numeric = Number(comparisonId);
+        comparisonId = Number.isFinite(numeric) ? numeric : comparisonId;
+      }
+
+      return { comparisonId };
+    });
 
     logger.info('Comparison created:', {
-      comparisonId,
+      comparisonId: result.comparisonId,
       baselineRunId,
       comparisonRunId,
     });
 
     return {
-      comparisonId,
+      comparisonId: result.comparisonId,
       baselineRunId,
       comparisonRunId,
       deviationThreshold,
       createdBy: createdBy.toUpperCase(),
     };
-    
   } catch (error) {
-    await conn.rollback();
     logger.error('Error creating comparison:', error);
     throw new ApiError(
       HTTP_STATUS.INTERNAL_SERVER_ERROR,
@@ -71,8 +82,6 @@ async function create(comparisonData) {
       ERROR_CODES.DATABASE_ERROR,
       error.message
     );
-  } finally {
-    await conn.close();
   }
 }
 
@@ -236,40 +245,34 @@ async function updateStatistics(comparisonId, stats) {
  * @returns {Promise<boolean>} Success status
  */
 async function remove(comparisonId) {
-  const conn = await transaction();
-  
   try {
-    // Delete comparison details first
-    const deleteDetailsSql = `
-      DELETE FROM ${getTableName('QRYRUN_COMPARISON_DETAILS')}
-      WHERE COMPARISON_ID = ?
-    `;
-    
-    await conn.execute(deleteDetailsSql, [comparisonId]);
-    
-    // Delete comparison
-    const deleteComparisonSql = `
-      DELETE FROM ${getTableName('QRYRUN_COMPARISONS')}
-      WHERE COMPARISON_ID = ?
-    `;
-    
-    await conn.execute(deleteComparisonSql, [comparisonId]);
-    
-    await conn.commit();
-    
+    const ok = await transaction(async (conn) => {
+      // Delete comparison details first
+      const deleteDetailsSql = `
+        DELETE FROM ${getTableName('QRYRUN_COMPARISON_DETAILS')}
+        WHERE COMPARISON_ID = ?
+      `;
+      await conn.execute(deleteDetailsSql, [comparisonId]);
+
+      // Delete comparison
+      const deleteComparisonSql = `
+        DELETE FROM ${getTableName('QRYRUN_COMPARISONS')}
+        WHERE COMPARISON_ID = ?
+      `;
+      await conn.execute(deleteComparisonSql, [comparisonId]);
+
+      return true;
+    });
+
     logger.info('Comparison deleted:', { comparisonId });
-    return true;
-    
+    return ok;
   } catch (error) {
-    await conn.rollback();
     logger.error('Error deleting comparison:', error);
     throw new ApiError(
       HTTP_STATUS.INTERNAL_SERVER_ERROR,
       'Failed to delete comparison',
       ERROR_CODES.DATABASE_ERROR
     );
-  } finally {
-    await conn.close();
   }
 }
 

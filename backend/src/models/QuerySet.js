@@ -420,14 +420,13 @@ async function remove(setId) {
  * @returns {Promise<Object>} Refresh statistics
  */
 async function refresh(setId, newQueries) {
-  const conn = await transaction();
-  
   try {
+    const result = await transaction(async (conn) => {
     // Get existing queries
     const existingQueriesSql = `
       SELECT QUERY_ID, QUERY_HASH, QUERY_TEXT
       FROM ${getTableName('QRYRUN_QUERIES')}
-  WHERE SET_ID = ? AND IS_ACTIVE = 'Y'
+      WHERE SET_ID = ? AND IS_ACTIVE = 'Y'
     `;
     
     const existingQueries = await conn.execute(existingQueriesSql, [setId]);
@@ -474,7 +473,7 @@ async function refresh(setId, newQueries) {
       WHERE SET_ID = ?
     `;
     
-    await conn.execute(updateSetSql, [setId]);
+  await conn.execute(updateSetSql, [setId]);
     
     // Log refresh operation
     const logSql = `
@@ -484,25 +483,24 @@ async function refresh(setId, newQueries) {
     `;
     
     await conn.execute(logSql, [setId, addedCount, deactivatedCount]);
-    
-    await conn.commit();
-    
-    logger.info('Query set refreshed:', { 
-      setId, 
-      addedCount, 
-      deactivatedCount,
-      totalQueries: existingQueries.length - deactivatedCount + addedCount,
-    });
-    
+
     return {
       success: true,
       addedCount,
       deactivatedCount,
       totalQueries: existingQueries.length - deactivatedCount + addedCount,
     };
-    
+    });
+
+    logger.info('Query set refreshed:', { 
+      setId, 
+      addedCount: result.addedCount, 
+      deactivatedCount: result.deactivatedCount,
+      totalQueries: result.totalQueries,
+    });
+
+    return result;
   } catch (error) {
-    await conn.rollback();
     logger.error('Error refreshing query set:', error);
     throw new ApiError(
       HTTP_STATUS.INTERNAL_SERVER_ERROR,
@@ -510,8 +508,6 @@ async function refresh(setId, newQueries) {
       ERROR_CODES.DATABASE_ERROR,
       error.message
     );
-  } finally {
-    await conn.close();
   }
 }
 
