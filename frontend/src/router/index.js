@@ -74,8 +74,10 @@ const router = createRouter({
 // Navigation guard
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
+  const hasToken = !!(authStore.token || (typeof localStorage !== 'undefined' && localStorage.getItem('token')))
   
-  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+  // Allow navigation if a token exists but user hasn't hydrated yet; bootstrap in main.js will validate session
+  if (to.meta.requiresAuth && !authStore.isAuthenticated && !hasToken) {
     next({ name: 'login', query: { redirect: to.fullPath } })
   } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
     next({ name: 'dashboard' })

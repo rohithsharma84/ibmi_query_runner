@@ -69,6 +69,14 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // Helpers to allow external bootstrap to hydrate state
+  function setToken(t) {
+    token.value = t
+  }
+  function setUser(u) {
+    user.value = u
+  }
+
   function clearError() {
     error.value = null
   }
@@ -87,6 +95,8 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     checkSession,
-    clearError
+    clearError,
+    setToken,
+    setUser
   }
 })
