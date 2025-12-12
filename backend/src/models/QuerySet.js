@@ -41,6 +41,10 @@ async function create(setData, queries = []) {
           )
       `;
 
+      // Add a unique token in ADDITIONAL_FILTERS so we can reliably select the row if driver returns no rows
+      const createToken = `CREATE_TOKEN:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+      const extraFilters = additionalFilters ? `${additionalFilters}||${createToken}` : createToken;
+
       const rows = await conn.execute(insertSelectSql, [
         setName,
         description || null,
@@ -48,7 +52,7 @@ async function create(setData, queries = []) {
         importDateFrom || null,
         importDateTo || null,
         effectiveView,
-        additionalFilters || null,
+        extraFilters,
         createdBy.toUpperCase(),
       ]);
 
@@ -58,6 +62,24 @@ async function create(setData, queries = []) {
         setId = r.SET_ID ?? r.set_id ?? r.Id ?? r[Object.keys(r)[0]] ?? null;
         const numeric = Number(setId);
         setId = Number.isFinite(numeric) ? numeric : setId;
+      }
+
+      // Fallback: if the driver returned no rows for FINAL TABLE, select back using the create token
+      if (setId == null) {
+        const fbSql = `
+          SELECT SET_ID
+            FROM ${getTableName('QRYRUN_QUERY_SETS')}
+           WHERE ADDITIONAL_FILTERS LIKE ?
+           ORDER BY CREATED_AT DESC
+           FETCH FIRST 1 ROWS ONLY
+        `;
+        const fbRows = await conn.execute(fbSql, [ `%${createToken}%` ]);
+        if (Array.isArray(fbRows) && fbRows.length > 0) {
+          const r = fbRows[0];
+          setId = r.SET_ID ?? r.set_id ?? r.Id ?? r[Object.keys(r)[0]] ?? null;
+          const numeric = Number(setId);
+          setId = Number.isFinite(numeric) ? numeric : setId;
+        }
       }
 
       // Add queries if provided
