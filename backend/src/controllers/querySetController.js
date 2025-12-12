@@ -190,11 +190,13 @@ async function getById(req, res, next) {
       setId,
     });
     
-  const querySet = await querySetService.getById(setId);
+    const querySetWithQueries = await querySetService.getById(setId);
     
+    // Include queries both nested under querySet and as a top-level array for frontend compatibility
     res.status(HTTP_STATUS.OK).json({
       success: true,
-      querySet,
+      querySet: querySetWithQueries,
+      queries: Array.isArray(querySetWithQueries?.queries) ? querySetWithQueries.queries : []
     });
   } catch (error) {
     next(error);
