@@ -36,12 +36,12 @@
         <table class="table">
           <thead>
             <tr>
+              <th class="w-32">Actions</th>
               <th>User Profile</th>
               <th>Role</th>
               <th>Status</th>
               <th>Created</th>
-              <th>Last Modified</th>
-              <th class="w-32">Actions</th>
+              <th>Last Login</th>
             </tr>
           </thead>
           <tbody>
@@ -51,8 +51,8 @@
                   <span class="font-medium" :title="isProtectedUser(user) ? 'System user (QSECOFR)' : ''">{{ user.user_profile }}</span>
                   <span v-if="isProtectedUser(user)" class="badge badge-secondary" title="System user (QSECOFR)">System</span>
                 </div>
-              </td>
-              <td>
+              <td class="text-sm text-gray-600">{{ formatDate(user.created_at) }}</td>
+              <td class="text-sm text-gray-600">{{ formatDate(user.last_login) }}</td>
                 <span class="badge" :class="user.is_admin ? 'badge-primary' : 'badge-secondary'">
                   {{ user.is_admin ? 'Admin' : 'User' }}
                 </span>
@@ -198,6 +198,8 @@ const submitting = ref(false)
 
 const formData = ref({
   user_profile: '',
+  user_name: '',
+  email: '',
   is_admin: false,
   is_active: true
 })
@@ -218,6 +220,29 @@ const loadUsers = async () => {
   } finally {
     loading.value = false
   }
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+            <input
+              v-model="formData.user_name"
+              type="text"
+              class="input"
+              placeholder="Enter full name"
+              maxlength="50"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <input
+              v-model="formData.email"
+              type="email"
+              class="input"
+              placeholder="Enter email address"
+              maxlength="100"
+            />
+            <p class="text-xs text-gray-500 mt-1">Optional; format will be validated</p>
+          </div>
 }
 
 const isCurrentUser = (user) => {
@@ -237,11 +262,12 @@ const addUser = async () => {
   
   try {
     await usersAPI.create({
-      user_profile: formData.value.user_profile,
-      userName: formData.value.user_profile,
-      is_admin: formData.value.is_admin,
-      is_active: formData.value.is_active
-    })
+        user_profile: formData.value.user_profile,
+        userName: formData.value.user_name || formData.value.user_profile,
+        email: formData.value.email || null,
+        is_admin: formData.value.is_admin,
+        is_active: formData.value.is_active
+      })
     success.value = `User ${formData.value.user_profile} added successfully`
     closeModal()
     await loadUsers()
@@ -267,12 +293,13 @@ const addUser = async () => {
       if (proceed) {
         try {
           await usersAPI.create({
-            user_profile: formData.value.user_profile,
-            userName: formData.value.user_profile,
-            is_admin: formData.value.is_admin,
-            is_active: formData.value.is_active,
-            allowBypass: true
-          })
+              user_profile: formData.value.user_profile,
+              userName: formData.value.user_name || formData.value.user_profile,
+              email: formData.value.email || null,
+              is_admin: formData.value.is_admin,
+              is_active: formData.value.is_active,
+              allowBypass: true
+            })
           success.value = `User ${formData.value.user_profile} added successfully`
           closeModal()
           await loadUsers()
@@ -303,6 +330,8 @@ const addUser = async () => {
 const editUser = (user) => {
   formData.value = {
     user_profile: user.user_profile,
+    user_name: user.user_name || user.user_profile,
+    email: user.email || '',
     is_admin: user.is_admin,
     is_active: user.is_active
   }
@@ -316,9 +345,11 @@ const updateUser = async () => {
   
   try {
     await usersAPI.update(formData.value.user_profile, {
-      is_admin: formData.value.is_admin,
-      is_active: formData.value.is_active
-    })
+        is_admin: formData.value.is_admin,
+        is_active: formData.value.is_active,
+        user_name: formData.value.user_name,
+        email: formData.value.email
+      })
     success.value = `User ${formData.value.user_profile} updated successfully`
     closeModal()
     await loadUsers()
@@ -361,6 +392,8 @@ const closeModal = () => {
   showEditModal.value = false
   formData.value = {
     user_profile: '',
+    user_name: '',
+    email: '',
     is_admin: false,
     is_active: true
   }

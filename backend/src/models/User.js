@@ -236,10 +236,62 @@ async function isAdmin(userId) {
   }
 }
 
+/**
+ * Update user fields
+ * @param {string} userId - IBM i user profile
+ * @param {Object} updates - Fields to update (isAdmin, userName, email)
+ * @returns {Promise<boolean>} True if updated
+ */
+async function update(userId, updates) {
+  try {
+    const ok = await transaction(async (conn) => {
+      const setClauses = [];
+      const params = [];
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'isAdmin')) {
+        setClauses.push('IS_ADMIN = ?');
+        params.push(updates.isAdmin ? 'Y' : 'N');
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'userName')) {
+        setClauses.push('USER_NAME = ?');
+        params.push(updates.userName);
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'email')) {
+        setClauses.push('EMAIL = ?');
+        params.push(updates.email);
+      }
+
+      if (setClauses.length === 0) {
+        return false;
+      }
+
+      const sql = `
+        UPDATE ${getTableName('QRYRUN_USERS')}
+        SET ${setClauses.join(', ')}
+        WHERE USER_ID = ?
+      `;
+      params.push(userId.toUpperCase());
+      await conn.execute(sql, params);
+      return true;
+    });
+
+    logger.info('User updated:', { userId, updates: { ...updates, isAdmin: updates?.isAdmin } });
+    return ok;
+  } catch (error) {
+    logger.error('Error updating user:', error);
+    throw new ApiError(
+      HTTP_STATUS.INTERNAL_SERVER_ERROR,
+      'Failed to update user',
+      ERROR_CODES.DB_CONNECTION_ERROR
+    );
+  }
+}
+
 module.exports = {
   findById,
   findAll,
   create,
+  update,
   updateLastLogin,
   deleteUser,
   isAuthorized,

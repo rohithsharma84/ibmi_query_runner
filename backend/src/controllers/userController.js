@@ -181,7 +181,11 @@ async function deleteUser(req, res) {
  */
 async function updateUser(req, res) {
   const { userId } = req.params;
-  const { is_admin, is_active } = req.body;
+  // Accept multiple payload shapes
+  const is_admin = req.body.is_admin ?? req.body.isAdmin;
+  const is_active = req.body.is_active ?? req.body.isActive; // ignored by model since table has no IS_ACTIVE
+  const userName = req.body.user_name ?? req.body.userName;
+  const email = req.body.email ?? null;
   
   // Don't allow changing your own admin status
   if (userId.toUpperCase() === req.user.userId.toUpperCase() && is_admin === false) {
@@ -210,11 +214,20 @@ async function updateUser(req, res) {
       ERROR_CODES.NOT_FOUND
     );
   }
+  // Validate email if provided
+  if (email && !isValidEmail(email)) {
+    throw new ApiError(
+      HTTP_STATUS.BAD_REQUEST,
+      'Invalid email format',
+      ERROR_CODES.VALIDATION_ERROR
+    );
+  }
   
   // Update user
   await User.update(userId, {
     isAdmin: is_admin,
-    isActive: is_active
+    userName,
+    email
   });
   
   logger.info('User updated by admin:', { 
