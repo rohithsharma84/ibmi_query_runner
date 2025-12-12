@@ -6,14 +6,15 @@ import './assets/main.css'
 import { useAuthStore } from '@/stores/auth'
 import { initAuthSession } from '@/utils/api'
 
+// Create app and mount with chained use to avoid variable reassignment quirks in minified bundles
 const app = createApp(App)
-const pinia = createPinia()
-app.use(pinia)
-app.use(router)
+	.use(createPinia())
+	.use(router)
+
 app.mount('#app')
 
 // After mount, hydrate token + session (guards tolerate token presence)
-(async () => {
+;(async () => {
 	const auth = useAuthStore()
 	try {
 		const session = await initAuthSession()
