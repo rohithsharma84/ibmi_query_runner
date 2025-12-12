@@ -74,7 +74,17 @@ async function create(userData) {
       const checkSql = `
         SELECT USER_ID FROM ${getTableName('QRYRUN_USERS')} WHERE USER_ID = ?
       `;
-      const existingRows = await conn.execute(checkSql, [userId.toUpperCase()]);
+      let existingRows = await conn.execute(checkSql, [userId.toUpperCase()]);
+      // Materialize jt400 handles if needed
+      try {
+        if (existingRows && typeof existingRows.asArray === 'function') {
+          existingRows = await existingRows.asArray();
+        } else if (existingRows && typeof existingRows.asObjectStream === 'function') {
+          const arr = [];
+          for await (const obj of existingRows.asObjectStream()) arr.push(obj);
+          existingRows = arr;
+        }
+      } catch {}
       if (Array.isArray(existingRows) && existingRows.length > 0) {
         throw new ApiError(
           HTTP_STATUS.CONFLICT,
@@ -102,14 +112,32 @@ async function create(userData) {
         FROM ${getTableName('QRYRUN_USERS')}
         WHERE USER_ID = ?
       `;
-      const rows = await conn.execute(selectSql, [userId.toUpperCase()]);
+      let rows = await conn.execute(selectSql, [userId.toUpperCase()]);
+      try {
+        if (rows && typeof rows.asArray === 'function') {
+          rows = await rows.asArray();
+        } else if (rows && typeof rows.asObjectStream === 'function') {
+          const arr = [];
+          for await (const obj of rows.asObjectStream()) arr.push(obj);
+          rows = arr;
+        }
+      } catch {}
       return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
     });
 
     logger.info('User created:', { userId });
     return created;
   } catch (error) {
+    // Map duplicate key SQL0803 to conflict
     if (error instanceof ApiError) throw error;
+    const msg = String(error?.message || '').toUpperCase();
+    if (msg.includes('SQL0803') || msg.includes('DUPLICATE')) {
+      throw new ApiError(
+        HTTP_STATUS.CONFLICT,
+        'User already exists',
+        ERROR_CODES.DUPLICATE_ENTRY
+      );
+    }
     logger.error('Error creating user:', error);
     throw new ApiError(
       HTTP_STATUS.INTERNAL_SERVER_ERROR,
