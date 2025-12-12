@@ -333,9 +333,9 @@ async function addQuery() {
   error.value = null
 
   try {
-    await queriesAPI.addToSet({
-      setId: parseInt(setId),
-      sqlText: newQuery.value.sqlText.trim()
+    await queriesAPI.addToSet(parseInt(setId), {
+      // Backend expects 'queryText'
+      queryText: newQuery.value.sqlText.trim()
     })
 
     showAddQueryModal.value = false

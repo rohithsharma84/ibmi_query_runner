@@ -205,10 +205,14 @@ function normalizeQuerySet(qs) {
 
 export const queriesAPI = {
   getById: (id) => api.get(`/queries/${id}`),
-  addToSet: (data) => api.post('/queries', data),
+  // Add a new query to a specific set
+  addToSet: (setId, data) => api.post(`/queries/sets/${setId}`, data),
+  // Update a specific query by ID
   update: (id, data) => api.put(`/queries/${id}`, data),
+  // Delete a specific query by ID
   remove: (id) => api.delete(`/queries/${id}`),
-  reorder: (id, data) => api.put(`/queries/${id}/reorder`, data)
+  // Reorder queries within a set
+  reorder: (setId, data) => api.post(`/queries/sets/${setId}/reorder`, data)
 }
 
 export const testRunsAPI = {
