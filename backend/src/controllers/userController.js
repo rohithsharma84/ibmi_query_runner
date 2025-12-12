@@ -68,7 +68,12 @@ async function getUser(req, res) {
  * Create new user (admin only)
  */
 async function createUser(req, res) {
-  const { userId, userName, email, isAdmin } = req.body;
+  // Accept multiple payload shapes from frontend
+  const userId = (req.body.userId || req.body.user_id || req.body.user_profile || '').toUpperCase();
+  const userName = req.body.userName || req.body.user_name || userId;
+  const email = req.body.email || null;
+  const isAdmin = req.body.isAdmin ?? req.body.is_admin ?? false;
+  const allowBypass = req.body.allowBypass === true || req.body.allow_bypass === true;
   
   // Validate input
   if (!userId) {
@@ -95,14 +100,25 @@ async function createUser(req, res) {
     );
   }
   
-  // Validate that IBM i user exists
-  const ibmiUserExists = await authService.validateIBMiUser(userId);
-  if (!ibmiUserExists) {
-    throw new ApiError(
-      HTTP_STATUS.BAD_REQUEST,
-      'IBM i user profile does not exist',
-      ERROR_CODES.VALIDATION_ERROR
-    );
+  // Validate that IBM i user exists (or caller has permission to check) unless bypass requested
+  if (!allowBypass) {
+    try {
+      const ibmiUserExists = await authService.validateIBMiUser(userId);
+      if (!ibmiUserExists) {
+        throw new ApiError(
+          HTTP_STATUS.BAD_REQUEST,
+          'The IBM i user does not exist or you do not have permission to verify it',
+          ERROR_CODES.VALIDATION_ERROR
+        );
+      }
+    } catch (e) {
+      // Handle cases where system lookup fails due to insufficient permissions
+      throw new ApiError(
+        HTTP_STATUS.BAD_REQUEST,
+        'The IBM i user does not exist or you do not have permission to verify it',
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
   }
   
   // Create user

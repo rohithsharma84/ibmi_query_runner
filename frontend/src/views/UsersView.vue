@@ -222,7 +222,12 @@ const addUser = async () => {
   success.value = ''
   
   try {
-    await usersAPI.create(formData.value)
+    await usersAPI.create({
+      user_profile: formData.value.user_profile,
+      userName: formData.value.user_profile,
+      is_admin: formData.value.is_admin,
+      is_active: formData.value.is_active
+    })
     success.value = `User ${formData.value.user_profile} added successfully`
     closeModal()
     await loadUsers()
@@ -232,7 +237,34 @@ const addUser = async () => {
       success.value = ''
     }, 3000)
   } catch (err) {
-    error.value = err.response?.data?.error || 'Failed to add user'
+    const msg = err.response?.data?.error?.message || err.response?.data?.error || ''
+    const code = err.response?.data?.error?.code
+    // If validation error due to existence/permission, offer bypass
+    if (code === 'VALIDATION_ERROR' && /does not exist|permission to verify/i.test(msg)) {
+      const proceed = window.confirm('Either the IBM i user does not exist or you do not have permissions to verify the user. Do you want to add the user anyway?')
+      if (proceed) {
+        try {
+          await usersAPI.create({
+            user_profile: formData.value.user_profile,
+            userName: formData.value.user_profile,
+            is_admin: formData.value.is_admin,
+            is_active: formData.value.is_active,
+            allowBypass: true
+          })
+          success.value = `User ${formData.value.user_profile} added successfully`
+          closeModal()
+          await loadUsers()
+          setTimeout(() => { success.value = '' }, 3000)
+          return
+        } catch (e2) {
+          error.value = e2.response?.data?.error || 'Failed to add user'
+        }
+      } else {
+        error.value = 'User not added'
+      }
+    } else {
+      error.value = err.response?.data?.error || 'Failed to add user'
+    }
   } finally {
     submitting.value = false
   }
