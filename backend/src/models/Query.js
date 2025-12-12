@@ -195,14 +195,15 @@ async function addToSet(setId, queryData) {
     // Get next sequence number if not provided
     let seqNum = sequenceNumber;
     if (!seqNum) {
+      // Use correct DB column name SEQUENCE_NUM
       const maxSeqSql = `
-        SELECT COALESCE(MAX(SEQUENCE_NUMBER), 0) AS MAX_SEQ
+        SELECT COALESCE(MAX(SEQUENCE_NUM), 0) AS MAX_SEQ
         FROM ${getTableName('QRYRUN_QUERIES')}
-  WHERE SET_ID = ? AND IS_ACTIVE = 'Y'
+        WHERE SET_ID = ? AND IS_ACTIVE = 'Y'
       `;
-      
+
       const maxSeqResult = await query(maxSeqSql, [setId]);
-      seqNum = maxSeqResult[0].MAX_SEQ + 1;
+      seqNum = (maxSeqResult?.[0]?.MAX_SEQ || 0) + 1;
     }
     
     // Generate unique query ID
