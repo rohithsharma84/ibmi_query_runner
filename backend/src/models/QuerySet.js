@@ -45,7 +45,7 @@ async function create(setData, queries = []) {
       const createToken = `CREATE_TOKEN:${Date.now()}:${Math.random().toString(36).slice(2)}`;
       const extraFilters = additionalFilters ? `${additionalFilters}||${createToken}` : createToken;
 
-      const rows = await conn.execute(insertSelectSql, [
+      let rows = await conn.execute(insertSelectSql, [
         setName,
         description || null,
         userProfile.toUpperCase(),
@@ -55,6 +55,19 @@ async function create(setData, queries = []) {
         extraFilters,
         createdBy.toUpperCase(),
       ]);
+
+      // If driver returned a handle, materialize rows
+      try {
+        if (rows && typeof rows.asArray === 'function') {
+          rows = await rows.asArray();
+        } else if (rows && typeof rows.asObjectStream === 'function') {
+          const arr = [];
+          for await (const obj of rows.asObjectStream()) arr.push(obj);
+          rows = arr;
+        }
+      } catch (matErr) {
+        logger.debug('QuerySet.create materialize rows error', { error: matErr.message });
+      }
 
       let setId = null;
       if (Array.isArray(rows) && rows.length > 0) {
@@ -73,7 +86,29 @@ async function create(setData, queries = []) {
            ORDER BY CREATED_AT DESC
            FETCH FIRST 1 ROWS ONLY
         `;
-        const fbRows = await conn.execute(fbSql, [ `%${createToken}%` ]);
+        let fbRows = await conn.execute(fbSql, [ `%${createToken}%` ]);
+        // Materialize fallback rows if needed
+        try {
+          if (fbRows && typeof fbRows.asArray === 'function') {
+            fbRows = await fbRows.asArray();
+          } else if (fbRows && typeof fbRows.asObjectStream === 'function') {
+            const arr = [];
+            for await (const obj of fbRows.asObjectStream()) arr.push(obj);
+            fbRows = arr;
+          }
+        } catch (matFbErr) {
+          logger.debug('QuerySet.create materialize fallback rows error', { error: matFbErr.message });
+        }
+        // Debug: log keys and first row
+        try {
+          const fbKeys = Object.keys(fbRows || {});
+          logger.debug('QuerySet.create fbRows keys', { fbKeys });
+          if (Array.isArray(fbRows) && fbRows.length > 0) {
+            logger.debug('QuerySet.create fbRows first row', { row: fbRows[0] });
+          }
+        } catch (fbLogErr) {
+          logger.debug('QuerySet.create fbRows log error', { error: fbLogErr.message });
+        }
         if (Array.isArray(fbRows) && fbRows.length > 0) {
           const r = fbRows[0];
           setId = r.SET_ID ?? r.set_id ?? r.Id ?? r[Object.keys(r)[0]] ?? null;
