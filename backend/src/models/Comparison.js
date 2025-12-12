@@ -202,6 +202,7 @@ async function findAll(filters = {}) {
  */
 async function updateStatistics(comparisonId, stats) {
   try {
+    const { transaction } = require('../config/database');
     const sql = `
       UPDATE ${getTableName('QRYRUN_COMPARISONS')}
       SET 
@@ -215,16 +216,18 @@ async function updateStatistics(comparisonId, stats) {
       WHERE COMPARISON_ID = ?
     `;
 
-    await query(sql, [
-      stats.setLevelChange || null,
-      stats.totalQueriesCompared || 0,
-      stats.queriesImproved || 0,
-      stats.queriesDegraded || 0,
-      stats.queriesUnchanged || 0,
-      stats.queriesFailedBaseline || 0,
-      stats.queriesFailedComparison || 0,
-      comparisonId,
-    ]);
+    await transaction(async (conn) => {
+      await conn.execute(sql, [
+        stats.setLevelChange || null,
+        stats.totalQueriesCompared || 0,
+        stats.queriesImproved || 0,
+        stats.queriesDegraded || 0,
+        stats.queriesUnchanged || 0,
+        stats.queriesFailedBaseline || 0,
+        stats.queriesFailedComparison || 0,
+        comparisonId,
+      ]);
+    });
     
     logger.info('Comparison statistics updated:', { comparisonId, stats });
     return true;
@@ -301,6 +304,7 @@ async function addDetail(detailData) {
 
     const status = isImprovement ? 'IMPROVED' : (hasDeviation ? 'DEGRADED' : 'UNCHANGED');
 
+    const { transaction } = require('../config/database');
     const sql = `
       INSERT INTO ${getTableName('QRYRUN_COMPARISON_DETAILS')}
       (COMPARISON_ID, QUERY_ID, BASELINE_AVG_MS, COMPARISON_AVG_MS,
@@ -309,20 +313,22 @@ async function addDetail(detailData) {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    await query(sql, [
-      comparisonId,
-      queryId,
-      baselineAvgTime || null,
-      comparisonAvgTime || null,
-      baselineMin || null,
-      comparisonMin || null,
-      baselineMax || null,
-      comparisonMax || null,
-      percentChange || null,
-      status,
-      baselineFailures || 0,
-      comparisonFailures || 0,
-    ]);
+    await transaction(async (conn) => {
+      await conn.execute(sql, [
+        comparisonId,
+        queryId,
+        baselineAvgTime || null,
+        comparisonAvgTime || null,
+        baselineMin || null,
+        comparisonMin || null,
+        baselineMax || null,
+        comparisonMax || null,
+        percentChange || null,
+        status,
+        baselineFailures || 0,
+        comparisonFailures || 0,
+      ]);
+    });
 
     return detailData;
 

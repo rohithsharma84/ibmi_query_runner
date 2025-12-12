@@ -112,14 +112,17 @@ async function update(queryId, updates) {
  */
 async function remove(queryId) {
   try {
-    const sql = `
-      UPDATE ${getTableName('QRYRUN_QUERIES')}
-      SET IS_ACTIVE = 'N'
-      WHERE QUERY_ID = ?
-    `;
-    
-    await query(sql, [queryId]);
-    
+    const { transaction } = require('../config/database');
+    // Use a single-connection transactional callback to avoid cursor/handle issues
+    await transaction(async (conn) => {
+      const sql = `
+        UPDATE ${getTableName('QRYRUN_QUERIES')}
+        SET IS_ACTIVE = 'N'
+        WHERE QUERY_ID = ?
+      `;
+      await conn.execute(sql, [queryId]);
+    });
+
     logger.info('Query deleted:', { queryId });
     return true;
     

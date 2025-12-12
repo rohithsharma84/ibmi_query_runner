@@ -174,18 +174,16 @@ async function addQueriesToSet(conn, setId, queries) {
     const existing = await conn.execute(checkSql, [setId, queryHash]);
     
     if (existing.length === 0) {
-      // Generate unique query ID
-      const queryId = `Q${Date.now()}${i}`;
-
-      // Insert query (map fields to DB schema)
+      // Insert query using FINAL TABLE to retrieve identity-generated QUERY_ID
       const insertQuerySql = `
-        INSERT INTO ${getTableName('QRYRUN_QUERIES')}
-        (QUERY_ID, SET_ID, QUERY_TEXT, QUERY_NAME, QUERY_HASH, SOURCE_USER, PLAN_CACHE_KEY, ADDED_AT, LAST_SEEN_IN_CACHE, IS_ACTIVE, SEQUENCE_NUM)
-        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, NULL, 'Y', ?)
+        SELECT QUERY_ID FROM FINAL TABLE (
+          INSERT INTO ${getTableName('QRYRUN_QUERIES')}
+          (SET_ID, QUERY_TEXT, QUERY_NAME, QUERY_HASH, SOURCE_USER, PLAN_CACHE_KEY, ADDED_AT, LAST_SEEN_IN_CACHE, IS_ACTIVE, SEQUENCE_NUM)
+          VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, NULL, 'Y', ?)
+        )
       `;
 
       await conn.execute(insertQuerySql, [
-        queryId,
         setId,
         queryText,
         queryObj.queryName || queryObj.QUERY_NAME || null,

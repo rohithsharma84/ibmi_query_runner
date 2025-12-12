@@ -21,33 +21,47 @@ const logger = require('../utils/logger');
 async function create(runData) {
   try {
     const { setId, runLabel, iterationCount, metricsLevel, createdBy } = runData;
-    
-    // Insert test run (RUN_ID is an IDENTITY column)
-    const sql = `
-      INSERT INTO ${getTableName('QRYRUN_TEST_RUNS')}
-      (SET_ID, RUN_NAME, RUN_DESCRIPTION, ITERATION_COUNT, METRICS_LEVEL,
-       STATUS, CREATED_BY, CREATED_AT)
-      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `;
 
-    await query(sql, [
-      setId,
-      runLabel,
-      runDescription || null,
-      iterationCount,
-      metricsLevel,
-      RUN_STATUS.PENDING,
-      createdBy.toUpperCase(),
-    ]);
+    // Use transactional FINAL TABLE (INSERT ...) to reliably retrieve identity RUN_ID
+    const result = await transaction(async (conn) => {
+      const insertSelectSql = `
+        SELECT RUN_ID FROM FINAL TABLE (
+          INSERT INTO ${getTableName('QRYRUN_TEST_RUNS')}
+          (SET_ID, RUN_NAME, RUN_DESCRIPTION, ITERATION_COUNT, METRICS_LEVEL,
+           STATUS, CREATED_BY, CREATED_AT)
+          VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        )
+      `;
 
-    // Retrieve generated RUN_ID
-    const idRes = await query("SELECT IDENTITY_VAL_LOCAL() AS RUN_ID FROM SYSIBM.SYSDUMMY1");
-    const runId = idRes && idRes.length > 0 ? idRes[0].RUN_ID : null;
-    
-    logger.info('Test run created:', { runId, setId, runLabel });
-    
+      let rows = await conn.execute(insertSelectSql, [
+        setId,
+        runLabel,
+        runData.runDescription || null,
+        iterationCount,
+        metricsLevel,
+        RUN_STATUS.PENDING,
+        createdBy.toUpperCase(),
+      ]);
+
+      // Materialize jt400 handles if needed
+      try {
+        if (rows && typeof rows.asArray === 'function') {
+          rows = await rows.asArray();
+        } else if (rows && typeof rows.asObjectStream === 'function') {
+          const arr = [];
+          for await (const obj of rows.asObjectStream()) arr.push(obj);
+          rows = arr;
+        }
+      } catch {}
+
+      const runId = Array.isArray(rows) && rows.length > 0 ? (rows[0].RUN_ID ?? rows[0].run_id ?? rows[0][Object.keys(rows[0])[0]]) : null;
+      return { runId };
+    });
+
+    logger.info('Test run created:', { runId: result.runId, setId, runLabel });
+
     return {
-      runId,
+      runId: result.runId,
       setId,
       runLabel,
       iterationCount,
@@ -55,7 +69,7 @@ async function create(runData) {
       status: RUN_STATUS.PENDING,
       createdBy: createdBy.toUpperCase(),
     };
-    
+
   } catch (error) {
     logger.error('Error creating test run:', error);
     throw new ApiError(
