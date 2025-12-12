@@ -46,29 +46,12 @@
           </thead>
           <tbody>
             <tr v-for="user in users" :key="user.user_profile" :class="{ 'opacity-60': isCurrentUser(user) || isProtectedUser(user) }">
-              <td>
-                <div class="flex items-center space-x-2">
-                  <span class="font-medium" :title="isProtectedUser(user) ? 'System user (QSECOFR)' : ''">{{ user.user_profile }}</span>
-                  <span v-if="isProtectedUser(user)" class="badge badge-secondary" title="System user (QSECOFR)">System</span>
-                </div>
-              <td class="text-sm text-gray-600">{{ formatDate(user.created_at) }}</td>
-              <td class="text-sm text-gray-600">{{ formatDate(user.last_login) }}</td>
-                <span class="badge" :class="user.is_admin ? 'badge-primary' : 'badge-secondary'">
-                  {{ user.is_admin ? 'Admin' : 'User' }}
-                </span>
-              </td>
-              <td>
-                <span class="badge" :class="user.is_active ? 'badge-success' : 'badge-danger'">
-                  {{ user.is_active ? 'Active' : 'Inactive' }}
-                </span>
-              </td>
-              <td class="text-sm text-gray-600">{{ formatDate(user.created_at) }}</td>
-              <td class="text-sm text-gray-600">{{ formatDate(user.modified_at) }}</td>
+              <!-- Actions -->
               <td>
                 <div class="flex space-x-2">
                   <button
                     @click="editUser(user)"
-                    :disabled="isCurrentUser(user)"
+                    :disabled="isCurrentUser(user) || isProtectedUser(user)"
                     :class="['text-primary-600 hover:text-primary-700', { 'opacity-50 cursor-not-allowed': isCurrentUser(user) || isProtectedUser(user) }]"
                     :title="isProtectedUser(user) ? 'QSECOFR cannot be modified' : (isCurrentUser(user) ? 'You cannot modify your own account here' : 'Edit user')"
                   >
@@ -88,6 +71,34 @@
                   </button>
                 </div>
               </td>
+
+              <!-- User Profile -->
+              <td>
+                <div class="flex items-center space-x-2">
+                  <span class="font-medium" :title="isProtectedUser(user) ? 'System user (QSECOFR)' : ''">{{ user.user_profile }}</span>
+                  <span v-if="isProtectedUser(user)" class="badge badge-secondary" title="System user (QSECOFR)">System</span>
+                </div>
+              </td>
+
+              <!-- Role -->
+              <td>
+                <span class="badge" :class="user.is_admin ? 'badge-primary' : 'badge-secondary'">
+                  {{ user.is_admin ? 'Admin' : 'User' }}
+                </span>
+              </td>
+
+              <!-- Status -->
+              <td>
+                <span class="badge" :class="user.is_active ? 'badge-success' : 'badge-danger'">
+                  {{ user.is_active ? 'Active' : 'Inactive' }}
+                </span>
+              </td>
+
+              <!-- Created -->
+              <td class="text-sm text-gray-600">{{ formatDate(user.created_at) }}</td>
+
+              <!-- Last Login -->
+              <td class="text-sm text-gray-600">{{ formatDate(user.last_login) }}</td>
             </tr>
           </tbody>
         </table>
@@ -135,6 +146,29 @@
               @input="formData.user_profile = formData.user_profile.toUpperCase()"
             />
             <p class="text-xs text-gray-500 mt-1">IBM i user profile (max 10 characters)</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+            <input
+              v-model="formData.user_name"
+              type="text"
+              class="input"
+              placeholder="Enter full name"
+              maxlength="50"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <input
+              v-model="formData.email"
+              type="email"
+              class="input"
+              placeholder="Enter email address"
+              maxlength="100"
+            />
+            <p class="text-xs text-gray-500 mt-1">Optional; format will be validated</p>
           </div>
 
           <div>
@@ -220,29 +254,6 @@ const loadUsers = async () => {
   } finally {
     loading.value = false
   }
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-            <input
-              v-model="formData.user_name"
-              type="text"
-              class="input"
-              placeholder="Enter full name"
-              maxlength="50"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
-            <input
-              v-model="formData.email"
-              type="email"
-              class="input"
-              placeholder="Enter email address"
-              maxlength="100"
-            />
-            <p class="text-xs text-gray-500 mt-1">Optional; format will be validated</p>
-          </div>
 }
 
 const isCurrentUser = (user) => {
