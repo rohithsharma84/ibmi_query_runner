@@ -379,42 +379,37 @@ async function update(setId, updates) {
  * @returns {Promise<boolean>} Success status
  */
 async function remove(setId) {
-  const conn = await transaction();
-  
   try {
-    // Soft delete query set
-    const deleteSetSql = `
-      UPDATE ${getTableName('QRYRUN_QUERY_SETS')}
-      SET IS_ACTIVE = 'N'
-      WHERE SET_ID = ?
-    `;
-    
-    await conn.execute(deleteSetSql, [setId]);
-    
-    // Soft delete all queries in the set
-    const deleteQueriesSql = `
-      UPDATE ${getTableName('QRYRUN_QUERIES')}
-      SET IS_ACTIVE = 'N'
-      WHERE SET_ID = ?
-    `;
-    
-    await conn.execute(deleteQueriesSql, [setId]);
-    
-    await conn.commit();
-    
+    // Use a single connection and transactional callback to avoid cursor/handle issues
+    const result = await transaction(async (conn) => {
+      // Soft delete all queries in the set first (optional ordering)
+      const deleteQueriesSql = `
+        UPDATE ${getTableName('QRYRUN_QUERIES')}
+        SET IS_ACTIVE = 'N'
+        WHERE SET_ID = ?
+      `;
+      await conn.execute(deleteQueriesSql, [setId]);
+
+      // Then soft delete the query set
+      const deleteSetSql = `
+        UPDATE ${getTableName('QRYRUN_QUERY_SETS')}
+        SET IS_ACTIVE = 'N'
+        WHERE SET_ID = ?
+      `;
+      await conn.execute(deleteSetSql, [setId]);
+
+      return true;
+    });
+
     logger.info('Query set deleted:', { setId });
-    return true;
-    
+    return result;
   } catch (error) {
-    await conn.rollback();
     logger.error('Error deleting query set:', error);
     throw new ApiError(
       HTTP_STATUS.INTERNAL_SERVER_ERROR,
       'Failed to delete query set',
       ERROR_CODES.DATABASE_ERROR
     );
-  } finally {
-    await conn.close();
   }
 }
 
