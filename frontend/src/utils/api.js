@@ -130,7 +130,18 @@ export const querySetsAPI = {
     return res
   }),
   getById: (id) => api.get(`/query-sets/${id}`).then(res => {
-    if (res?.data?.querySet) res.data.querySet = normalizeQuerySet(res.data.querySet)
+    if (res?.data?.querySet) {
+      // Normalize the query set object
+      res.data.querySet = normalizeQuerySet(res.data.querySet)
+      // Normalize nested queries inside querySet if present
+      if (Array.isArray(res.data.querySet.queries)) {
+        res.data.querySet.queries = res.data.querySet.queries.map(normalizeQuery)
+      }
+    }
+    // Also normalize top-level queries array for compatibility
+    if (Array.isArray(res?.data?.queries)) {
+      res.data.queries = res.data.queries.map(normalizeQuery)
+    }
     return res
   }),
   createFromPlanCache: (data) => api.post('/query-sets/from-plan-cache', data).then(res => {
@@ -199,6 +210,37 @@ function normalizeQuerySet(qs) {
       normalized[camel] = qs[k]
     }
   })
+
+  return normalized
+}
+
+// Helper: normalize query payload keys from DB (uppercase) to frontend expected snake_case
+function normalizeQuery(q) {
+  if (!q || typeof q !== 'object') return q
+
+  const normalized = {}
+  // Map known fields
+  normalized.query_id = q.QUERY_ID ?? q.query_id
+  normalized.set_id = q.SET_ID ?? q.set_id
+  normalized.sql_text = q.QUERY_TEXT ?? q.sql_text
+  normalized.query_hash = q.QUERY_HASH ?? q.query_hash
+  normalized.sequence_number = q.SEQUENCE_NUMBER ?? q.sequence_number ?? q.SEQUENCE_NUM ?? q.sequence_num
+  normalized.query_name = q.QUERY_NAME ?? q.query_name
+  normalized.original_user = q.ORIGINAL_USER ?? q.original_user
+  normalized.original_run_count = q.ORIGINAL_RUN_COUNT ?? q.original_run_count
+  normalized.added_at = q.ADDED_AT ?? q.added_at
+  normalized.is_active = q.IS_ACTIVE === 'Y' || q.is_active === true || true
+
+  // Provide camelCase counterparts for convenience
+  normalized.queryId = normalized.query_id
+  normalized.setId = normalized.set_id
+  normalized.sqlText = normalized.sql_text
+  normalized.queryHash = normalized.query_hash
+  normalized.sequenceNumber = normalized.sequence_number
+  normalized.queryName = normalized.query_name
+  normalized.originalUser = normalized.original_user
+  normalized.originalRunCount = normalized.original_run_count
+  normalized.addedAt = normalized.added_at
 
   return normalized
 }
