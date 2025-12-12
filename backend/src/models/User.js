@@ -183,18 +183,20 @@ async function deleteUser(userId) {
         ERROR_CODES.AUTHORIZATION_FAILED
       );
     }
-    
-    const sql = `
-      DELETE FROM ${getTableName('QRYRUN_USERS')}
-      WHERE USER_ID = ?
-    `;
-    
-    const result = await query(sql, [userId.toUpperCase()]);
+
+    const ok = await transaction(async (conn) => {
+      const sql = `
+        DELETE FROM ${getTableName('QRYRUN_USERS')}
+        WHERE USER_ID = ?
+      `;
+      await conn.execute(sql, [userId.toUpperCase()]);
+      return true;
+    });
+
     logger.info('User deleted:', { userId });
-    return true;
+    return ok;
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    
     logger.error('Error deleting user:', error);
     throw new ApiError(
       HTTP_STATUS.INTERNAL_SERVER_ERROR,
