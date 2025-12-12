@@ -45,9 +45,12 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="user in users" :key="user.user_profile" :class="{ 'opacity-60': isCurrentUser(user) }">
+            <tr v-for="user in users" :key="user.user_profile" :class="{ 'opacity-60': isCurrentUser(user) || isProtectedUser(user) }">
               <td>
-                <div class="font-medium">{{ user.user_profile }}</div>
+                <div class="flex items-center space-x-2">
+                  <span class="font-medium" :title="isProtectedUser(user) ? 'System user (QSECOFR)' : ''">{{ user.user_profile }}</span>
+                  <span v-if="isProtectedUser(user)" class="badge badge-secondary" title="System user (QSECOFR)">System</span>
+                </div>
               </td>
               <td>
                 <span class="badge" :class="user.is_admin ? 'badge-primary' : 'badge-secondary'">
@@ -66,15 +69,15 @@
                   <button
                     @click="editUser(user)"
                     :disabled="isCurrentUser(user)"
-                    :class="['text-primary-600 hover:text-primary-700', { 'opacity-50 cursor-not-allowed': isCurrentUser(user) }]"
-                    :title="isCurrentUser(user) ? 'You cannot modify your own account here' : 'Edit user'"
+                    :class="['text-primary-600 hover:text-primary-700', { 'opacity-50 cursor-not-allowed': isCurrentUser(user) || isProtectedUser(user) }]"
+                    :title="isProtectedUser(user) ? 'QSECOFR cannot be modified' : (isCurrentUser(user) ? 'You cannot modify your own account here' : 'Edit user')"
                   >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                   </button>
                   <button
-                    v-if="!isCurrentUser(user)"
+                    v-if="!isCurrentUser(user) && !isProtectedUser(user)"
                     @click="deleteUser(user)"
                     class="text-danger-600 hover:text-danger-700"
                     title="Delete user"
@@ -221,6 +224,10 @@ const isCurrentUser = (user) => {
   const up = (user?.user_profile || '').toUpperCase()
   const me = (currentUser || '').toUpperCase()
   return up && me && up === me
+}
+
+const isProtectedUser = (user) => {
+  return (user?.user_profile || '').toUpperCase() === 'QSECOFR'
 }
 
 const addUser = async () => {

@@ -190,6 +190,15 @@ async function updateUser(req, res) {
       ERROR_CODES.AUTHORIZATION_FAILED
     );
   }
+
+  // Do not allow modifying QSECOFR
+  if (userId.toUpperCase() === 'QSECOFR') {
+    throw new ApiError(
+      HTTP_STATUS.FORBIDDEN,
+      'Cannot modify QSECOFR user',
+      ERROR_CODES.AUTHORIZATION_FAILED
+    );
+  }
   
   // Check if user exists
   const user = await User.findById(userId);
