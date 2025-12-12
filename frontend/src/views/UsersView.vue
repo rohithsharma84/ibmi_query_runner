@@ -242,6 +242,8 @@ const addUser = async () => {
     const code = err.response?.data?.error?.code
     // Duplicate user: show graceful message
     if (status === 409 || code === 'DUPLICATE_ENTRY' || /already exists/i.test(msg)) {
+      // Close modal so the message is visible
+      closeModal()
       error.value = `User ${formData.value.user_profile} already exists`
       return
     }
@@ -267,6 +269,7 @@ const addUser = async () => {
           const m2 = e2.response?.data?.error?.message || e2.response?.data?.error || ''
           const c2 = e2.response?.data?.error?.code
           if (s2 === 409 || c2 === 'DUPLICATE_ENTRY' || /already exists/i.test(m2)) {
+            closeModal()
             error.value = `User ${formData.value.user_profile} already exists`
             return
           }
