@@ -45,7 +45,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="user in users" :key="user.user_profile">
+            <tr v-for="user in users" :key="user.user_profile" :class="{ 'opacity-60': isCurrentUser(user) }">
               <td>
                 <div class="font-medium">{{ user.user_profile }}</div>
               </td>
@@ -65,15 +65,16 @@
                 <div class="flex space-x-2">
                   <button
                     @click="editUser(user)"
-                    class="text-primary-600 hover:text-primary-700"
-                    title="Edit user"
+                    :disabled="isCurrentUser(user)"
+                    :class="['text-primary-600 hover:text-primary-700', { 'opacity-50 cursor-not-allowed': isCurrentUser(user) }]"
+                    :title="isCurrentUser(user) ? 'You cannot modify your own account here' : 'Edit user'"
                   >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                   </button>
                   <button
-                    v-if="user.user_profile !== currentUser"
+                    v-if="!isCurrentUser(user)"
                     @click="deleteUser(user)"
                     class="text-danger-600 hover:text-danger-700"
                     title="Delete user"
@@ -182,7 +183,7 @@ import { usersAPI } from '@/utils/api'
 import { formatDate } from '@/utils/formatters'
 
 const authStore = useAuthStore()
-const currentUser = authStore.user?.userProfile
+const currentUser = authStore.user?.userProfile || authStore.user?.USER_ID || authStore.user?.userId
 
 const users = ref([])
 const loading = ref(false)
@@ -214,6 +215,12 @@ const loadUsers = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const isCurrentUser = (user) => {
+  const up = (user?.user_profile || '').toUpperCase()
+  const me = (currentUser || '').toUpperCase()
+  return up && me && up === me
 }
 
 const addUser = async () => {

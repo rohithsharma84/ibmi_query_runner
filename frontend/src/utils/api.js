@@ -85,10 +85,34 @@ export async function initAuthSession() {
 }
 
 export const usersAPI = {
-  getAll: () => api.get('/users'),
+  getAll: () => api.get('/users').then(res => {
+    // Normalize backend payload { success, users: [...] } to array with expected keys
+    const users = Array.isArray(res?.data?.users) ? res.data.users.map(normalizeUser) : []
+    return { data: users }
+  }),
   create: (userData) => api.post('/users', userData),
   update: (userId, userData) => api.put(`/users/${userId}`, userData),
   remove: (userId) => api.delete(`/users/${userId}`)
+}
+
+// Helper: normalize user payload from backend to frontend expected keys
+function normalizeUser(u) {
+  if (!u || typeof u !== 'object') return u
+  const userId = u.USER_ID ?? u.userId ?? u.user_id ?? u.user_profile
+  const isAdmin = u.IS_ADMIN ?? u.isAdmin ?? u.is_admin
+  const createdAt = u.CREATED_AT ?? u.createdAt ?? u.created_at
+  const lastLogin = u.LAST_LOGIN ?? u.lastLogin ?? u.last_login
+
+  return {
+    user_profile: userId,
+    userId,
+    user_name: u.USER_NAME ?? u.userName ?? u.user_name ?? userId,
+    is_admin: isAdmin === 'Y' || isAdmin === 1 || isAdmin === true,
+    is_active: u.IS_ACTIVE === 'Y' || u.is_active === true || true, // default to true if not provided
+    created_at: createdAt,
+    modified_at: u.MODIFIED_AT ?? u.modifiedAt ?? u.modified_at ?? null,
+    last_login: lastLogin
+  }
 }
 
 export const planCacheAPI = {
