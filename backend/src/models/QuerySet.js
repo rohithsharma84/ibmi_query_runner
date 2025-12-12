@@ -168,7 +168,7 @@ async function addQueriesToSet(conn, setId, queries) {
     // Check if query already exists in this set
     const checkSql = `
       SELECT QUERY_ID FROM ${getTableName('QRYRUN_QUERIES')}
-      WHERE SET_ID = ? AND QUERY_HASH = ? AND IS_ACTIVE = 1
+  WHERE SET_ID = ? AND QUERY_HASH = ? AND IS_ACTIVE = 'Y'
     `;
     
     const existing = await conn.execute(checkSql, [setId, queryHash]);
@@ -355,7 +355,7 @@ async function update(setId, updates) {
     const sql = `
       UPDATE ${getTableName('QRYRUN_QUERY_SETS')}
       SET ${setClauses.join(', ')}
-      WHERE SET_ID = ? AND IS_ACTIVE = 1
+  WHERE SET_ID = ? AND IS_ACTIVE = 'Y'
     `;
     
     await query(sql, params);
@@ -385,7 +385,7 @@ async function remove(setId) {
     // Soft delete query set
     const deleteSetSql = `
       UPDATE ${getTableName('QRYRUN_QUERY_SETS')}
-      SET IS_ACTIVE = 0
+      SET IS_ACTIVE = 'N'
       WHERE SET_ID = ?
     `;
     
@@ -394,7 +394,7 @@ async function remove(setId) {
     // Soft delete all queries in the set
     const deleteQueriesSql = `
       UPDATE ${getTableName('QRYRUN_QUERIES')}
-      SET IS_ACTIVE = 0
+      SET IS_ACTIVE = 'N'
       WHERE SET_ID = ?
     `;
     
@@ -432,7 +432,7 @@ async function refresh(setId, newQueries) {
     const existingQueriesSql = `
       SELECT QUERY_ID, QUERY_HASH, QUERY_TEXT
       FROM ${getTableName('QRYRUN_QUERIES')}
-      WHERE SET_ID = ? AND IS_ACTIVE = 1
+  WHERE SET_ID = ? AND IS_ACTIVE = 'Y'
     `;
     
     const existingQueries = await conn.execute(existingQueriesSql, [setId]);
@@ -459,7 +459,7 @@ async function refresh(setId, newQueries) {
     if (hashesToDeactivate.length > 0) {
       const deactivateSql = `
         UPDATE ${getTableName('QRYRUN_QUERIES')}
-        SET IS_ACTIVE = 0
+  SET IS_ACTIVE = 'N'
         WHERE SET_ID = ? AND QUERY_HASH = ?
       `;
       

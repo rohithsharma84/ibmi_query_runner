@@ -179,7 +179,7 @@ async function addToSet(setId, queryData) {
     // Check if query already exists in this set
     const checkSql = `
       SELECT QUERY_ID FROM ${getTableName('QRYRUN_QUERIES')}
-      WHERE SET_ID = ? AND QUERY_HASH = ? AND IS_ACTIVE = 1
+  WHERE SET_ID = ? AND QUERY_HASH = ? AND IS_ACTIVE = 'Y'
     `;
     
     const existing = await query(checkSql, [setId, queryHash]);
@@ -198,7 +198,7 @@ async function addToSet(setId, queryData) {
       const maxSeqSql = `
         SELECT COALESCE(MAX(SEQUENCE_NUMBER), 0) AS MAX_SEQ
         FROM ${getTableName('QRYRUN_QUERIES')}
-        WHERE SET_ID = ? AND IS_ACTIVE = 1
+  WHERE SET_ID = ? AND IS_ACTIVE = 'Y'
       `;
       
       const maxSeqResult = await query(maxSeqSql, [setId]);
