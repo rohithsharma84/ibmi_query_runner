@@ -206,18 +206,16 @@ async function addToSet(setId, queryData) {
       seqNum = (maxSeqResult?.[0]?.MAX_SEQ || 0) + 1;
     }
     
-    // Generate unique query ID
-    const queryId = `Q${Date.now()}`;
-    
-    // Insert query
+    // Insert query and retrieve generated identity using FINAL TABLE
     const insertSql = `
-      INSERT INTO ${getTableName('QRYRUN_QUERIES')}
-      (QUERY_ID, SET_ID, QUERY_TEXT, QUERY_NAME, QUERY_HASH, SOURCE_USER, PLAN_CACHE_KEY, ADDED_AT, LAST_SEEN_IN_CACHE, IS_ACTIVE, SEQUENCE_NUM)
-      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, NULL, 'Y', ?)
+      SELECT QUERY_ID FROM FINAL TABLE (
+        INSERT INTO ${getTableName('QRYRUN_QUERIES')}
+        (SET_ID, QUERY_TEXT, QUERY_NAME, QUERY_HASH, SOURCE_USER, PLAN_CACHE_KEY, ADDED_AT, LAST_SEEN_IN_CACHE, IS_ACTIVE, SEQUENCE_NUM)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, NULL, 'Y', ?)
+      )
     `;
 
-    await query(insertSql, [
-      queryId,
+    const insertRes = await query(insertSql, [
       setId,
       queryText,
       queryData.queryName || queryData.QUERY_NAME || statementType || 'UNKNOWN',
@@ -226,7 +224,8 @@ async function addToSet(setId, queryData) {
       queryData.planCacheKey || queryData.PLAN_CACHE_KEY || null,
       seqNum,
     ]);
-    
+
+    const queryId = insertRes?.[0]?.QUERY_ID;
     logger.info('Query added to set:', { queryId, setId });
     
     return {
