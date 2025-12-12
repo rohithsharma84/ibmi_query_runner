@@ -9,13 +9,22 @@ const api = axios.create({
   }
 })
 
+// Read token from localStorage (persistent across refresh)
+function getPersistedToken() {
+  try {
+    return localStorage.getItem('token') || null
+  } catch {
+    return null
+  }
+}
+
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
     const authStore = useAuthStore()
-    if (authStore.token) {
-      config.headers.Authorization = `Bearer ${authStore.token}`
-    }
+    // prefer store token, fallback to localStorage for hard refresh
+    const token = authStore.token || getPersistedToken()
+    if (token) config.headers.Authorization = `Bearer ${token}`
     return config
   },
   (error) => {
@@ -28,13 +37,15 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const authStore = useAuthStore()
-    
     if (error.response?.status === 401) {
-      // Token expired or invalid
+      // Token expired or invalid: clear persisted token and redirect
+      try { localStorage.removeItem('token') } catch {}
       authStore.logout()
-      window.location.href = '/login'
+      // Optional: avoid redirect loops; only redirect on explicit auth endpoints or first load
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
     }
-    
     return Promise.reject(error)
   }
 )
@@ -43,9 +54,33 @@ export default api
 
 // API endpoints
 export const authAPI = {
-  login: (credentials) => api.post('/auth/login', credentials),
+  login: async (credentials) => {
+    const res = await api.post('/auth/login', credentials)
+    // Persist token so session survives browser refresh
+    const token = res?.data?.token
+    if (token) {
+      try { localStorage.setItem('token', token) } catch {}
+      // hydrate store if available
+      const authStore = useAuthStore()
+      if (authStore?.setToken) authStore.setToken(token)
+    }
+    return res
+  },
   logout: () => api.post('/auth/logout'),
   checkSession: () => api.get('/auth/session')
+}
+
+// Optional: helper to initialize auth on app startup
+export async function initAuthSession() {
+  const token = getPersistedToken()
+  const authStore = useAuthStore()
+  if (token && authStore?.setToken) authStore.setToken(token)
+  try {
+    const res = await api.get('/auth/session')
+    return res?.data || { authenticated: false }
+  } catch {
+    return { authenticated: false }
+  }
 }
 
 export const usersAPI = {
