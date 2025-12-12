@@ -30,14 +30,18 @@ async function create(setData, queries = []) {
       const { PLAN_CACHE_VIEWS } = require('../config/constants');
       const effectiveView = planCacheView || PLAN_CACHE_VIEWS.PLAN_CACHE_INFO;
 
-      // Insert query set (SET_ID is an IDENTITY column, let the DB generate it)
-      const insertSetSql = `
-        INSERT INTO ${getTableName('QRYRUN_QUERY_SETS')}
-        (SET_NAME, SET_DESCRIPTION, SOURCE_USER_PROFILE, IMPORT_DATE_FROM, IMPORT_DATE_TO, PLAN_CACHE_VIEW, ADDITIONAL_FILTERS, CREATED_BY, CREATED_AT, IS_ACTIVE, QUERY_COUNT)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'Y', 0)
+      // Db2 for i: use SELECT FROM FINAL TABLE (INSERT ...) to get identity reliably
+      const insertSelectSql = `
+        SELECT SET_ID
+          FROM FINAL TABLE (
+            INSERT INTO ${getTableName('QRYRUN_QUERY_SETS')}
+              (SET_NAME, SET_DESCRIPTION, SOURCE_USER_PROFILE, IMPORT_DATE_FROM, IMPORT_DATE_TO,
+               PLAN_CACHE_VIEW, ADDITIONAL_FILTERS, CREATED_BY, CREATED_AT, IS_ACTIVE, QUERY_COUNT)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'Y', 0)
+          )
       `;
 
-      await conn.execute(insertSetSql, [
+      const rows = await conn.execute(insertSelectSql, [
         setName,
         description || null,
         userProfile.toUpperCase(),
@@ -48,55 +52,12 @@ async function create(setData, queries = []) {
         createdBy.toUpperCase(),
       ]);
 
-      // Retrieve the generated SET_ID (IDENTITY) on the same connection
-      const idRes = await conn.execute("SELECT IDENTITY_VAL_LOCAL() AS SET_ID FROM SYSIBM.SYSDUMMY1");
-      // Debug: log raw identity result to diagnose driver behavior
-      logger.debug('QuerySet.create identity raw result', { idRes });
-      // Dump the keys returned by the driver result (debug-only)
-      try {
-        const idResKeys = Object.keys(idRes || {});
-        logger.debug('QuerySet.create identity keys', { idResKeys });
-      } catch (keyErr) {
-        logger.debug('QuerySet.create identity keys error', { error: keyErr.message });
-      }
-
-      // node-jt400 / driver may return column keys in different cases or shapes; handle several variants
       let setId = null;
-      if (idRes && idRes.length > 0) {
-        const idRow = idRes[0];
-        logger.debug('QuerySet.create identity row', { idRow });
-        setId = idRow.SET_ID ?? idRow.Set_Id ?? idRow.set_id ?? idRow['IDENTITY_VAL_LOCAL()'] ?? idRow.IDENTITY_VAL_LOCAL ?? idRow.ID ?? idRow[Object.keys(idRow)[0]];
-        if (setId !== null && setId !== undefined) {
-          // coerce to number when possible
-          const numeric = Number(setId);
-          setId = Number.isFinite(numeric) ? numeric : setId;
-        }
-      }
-
-      // Fallback: if identity was not returned, try to look up the row by unique combination
-      if (setId === null || setId === undefined) {
-        try {
-          const fallbackSql = `SELECT SET_ID FROM ${getTableName('QRYRUN_QUERY_SETS')} WHERE SET_NAME = ? AND CREATED_BY = ? ORDER BY CREATED_AT DESC FETCH FIRST 1 ROWS ONLY`;
-          const fallbackRes = await conn.execute(fallbackSql, [setName, createdBy.toUpperCase()]);
-          logger.debug('QuerySet.create fallback raw result', { fallbackRes });
-          // Dump the keys returned by the fallback result (debug-only)
-          try {
-            const fallbackKeys = Object.keys(fallbackRes || {});
-            logger.debug('QuerySet.create fallback keys', { fallbackKeys });
-          } catch (fkErr) {
-            logger.debug('QuerySet.create fallback keys error', { error: fkErr.message });
-          }
-          if (fallbackRes && fallbackRes.length > 0) {
-            const r = fallbackRes[0];
-            logger.debug('QuerySet.create fallback row', { fallbackRow: r });
-            setId = r.SET_ID ?? r.set_id ?? r.Set_Id ?? r.ID ?? r[Object.keys(r)[0]] ?? null;
-            const numeric = Number(setId);
-            setId = Number.isFinite(numeric) ? numeric : setId;
-          }
-        } catch (fbErr) {
-          // ignore fallback errors here; we'll let the main flow return without id if unavoidable
-          logger.warn('Fallback lookup for SET_ID failed', { error: fbErr.message });
-        }
+      if (Array.isArray(rows) && rows.length > 0) {
+        const r = rows[0];
+        setId = r.SET_ID ?? r.set_id ?? r.Id ?? r[Object.keys(r)[0]] ?? null;
+        const numeric = Number(setId);
+        setId = Number.isFinite(numeric) ? numeric : setId;
       }
 
       // Add queries if provided
@@ -247,13 +208,13 @@ async function findAll(filters = {}) {
     const params = [];
     
     if (filters.userProfile) {
-      sql += ` AND qs.USER_PROFILE = ?`;
-      params.push(filters.userProfile.toUpperCase());
+      sql += ` AND qs.SOURCE_USER_PROFILE = ?`;
+      params.push(String(filters.userProfile).toUpperCase());
     }
     
     if (filters.createdBy) {
       sql += ` AND qs.CREATED_BY = ?`;
-      params.push(filters.createdBy.toUpperCase());
+      params.push(String(filters.createdBy).toUpperCase());
     }
     
     sql += `
@@ -293,8 +254,8 @@ async function getQueries(setId) {
         0 AS ORIGINAL_RUN_COUNT,
         ADDED_AT
       FROM ${getTableName('QRYRUN_QUERIES')}
-      WHERE SET_ID = ? AND IS_ACTIVE = 1
-      ORDER BY SEQUENCE_NUMBER
+      WHERE SET_ID = ? AND IS_ACTIVE = 'Y'
+      ORDER BY SEQUENCE_NUM
     `;
     
     return await query(sql, [setId]);
