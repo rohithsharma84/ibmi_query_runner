@@ -6,7 +6,7 @@
         <h1 class="text-3xl font-bold text-gray-900">User Management</h1>
         <p class="text-gray-600 mt-2">Manage authorized users for the Query Runner application</p>
       </div>
-      <button @click="showAddModal = true" class="btn-primary">
+      <button v-if="authStore.isAdmin" @click="showAddModal = true" class="btn-primary">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
@@ -97,13 +97,13 @@
       </svg>
       <h3 class="text-lg font-medium text-gray-900 mb-2">No Users Found</h3>
       <p class="text-gray-600 mb-4">Get started by adding your first user.</p>
-      <button @click="showAddModal = true" class="btn-primary">
+      <button v-if="authStore.isAdmin" @click="showAddModal = true" class="btn-primary">
         Add User
       </button>
     </div>
 
     <!-- Add/Edit User Modal -->
-    <div v-if="showAddModal || showEditModal" class="modal" @click.self="closeModal">
+  <div v-if="authStore.isAdmin && (showAddModal || showEditModal)" class="modal" @click.self="closeModal">
       <div class="modal-content max-w-md">
         <div class="flex justify-between items-start mb-4">
           <h3 class="text-xl font-semibold">{{ showEditModal ? 'Edit User' : 'Add User' }}</h3>
