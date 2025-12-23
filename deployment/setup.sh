@@ -13,6 +13,11 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+echo "Step 0: Installing system utilities..."
+yum install -y wget unzip openssl git jq curl
+echo "✓ System utilities installed"
+echo ""
+
 echo "Step 1: Installing Node.js 24..."
 curl -fsSL https://rpm.nodesource.com/setup_24.x | bash -
 yum install -y nodejs
