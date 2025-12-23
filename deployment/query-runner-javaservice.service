@@ -1,0 +1,17 @@
+[Unit]
+Description=Query Runner Java Microservice
+After=network.target
+
+[Service]
+Type=simple
+User=queryrunner
+WorkingDirectory=/opt/query-runner/javaservice
+ExecStart=/usr/bin/java -Xmx1024m -Xms512m -jar target/jt400-query-service-1.0.0.jar
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/log/query_runner/javaservice.log
+StandardError=append:/var/log/query_runner/javaservice.log
+Environment="SPRING_PROFILES_ACTIVE=production"
+
+[Install]
+WantedBy=multi-user.target

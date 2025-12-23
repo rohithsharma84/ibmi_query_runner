@@ -1,0 +1,51 @@
+{
+  "name": "query-runner-backend",
+  "version": "1.0.0",
+  "description": "Query Runner - IBM i Db2 Query Testing Platform",
+  "main": "server.js",
+  "scripts": {
+    "dev": "ts-node server.ts & next dev -p 3000",
+    "build": "next build && tsc server.ts",
+    "start": "node server.js",
+    "server": "ts-node server.ts",
+    "init": "ts-node scripts/init-app.ts",
+    "db:init": "ts-node scripts/init-db.ts"
+  },
+  "dependencies": {
+    "next": "^15.1.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "express": "^5.2.1",
+    "express-session": "^1.18.2",
+    "connect-pg-simple": "^9.0.1",
+    "pg": "^8.11.0",
+    "pg-pool": "^3.7.0",
+    "jsonwebtoken": "^9.0.3",
+    "argon2": "^0.44.0",
+    "dotenv": "^16.4.5",
+    "node-vault": "^0.10.3",
+    "axios": "^1.7.7",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "uuid": "^10.0.0",
+    "json2csv": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/express": "^4.17.21",
+    "@types/express-session": "^1.17.11",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2",
+    "@types/morgan": "^1.9.9",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.32",
+    "autoprefixer": "^10.4.16"
+  },
+  "engines": {
+    "node": ">=24.12.0"
+  }
+}
