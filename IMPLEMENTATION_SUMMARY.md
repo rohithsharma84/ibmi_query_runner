@@ -246,7 +246,7 @@ All frontend components and pages have been fully implemented!
 
 ```bash
 # Prerequisites
-# - Node.js 24+, Java 17, PostgreSQL 15, Vault
+# - Node.js 24+, Java 21, PostgreSQL 15, Vault
 
 # Backend setup
 cd backend && npm install && npm run init

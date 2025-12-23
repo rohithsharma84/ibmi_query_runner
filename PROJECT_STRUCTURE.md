@@ -162,7 +162,7 @@ MAX_CONCURRENT_RUNS=5
 - **Frontend**: React 19, Next.js 15
 - **Backend**: Express.js 5, Node.js 24
 - **Database**: PostgreSQL 15
-- **Java Service**: Spring Boot 3.2, Java 17
+- **Java Service**: Spring Boot 3.2, Java 21
 - **Database Driver**: JT400 21.0.6
 - **Connection Pool**: HikariCP 7.0.2
 - **Authentication**: JWT, Argon2

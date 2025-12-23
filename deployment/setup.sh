@@ -23,9 +23,9 @@ echo "Installing Node.js 24..."
 curl -fsSL https://rpm.nodesource.com/setup_24.x | bash -
 yum install -y nodejs
 
-# Install Java 17
-echo "Installing Java 17..."
-yum install -y java-17-openjdk java-17-openjdk-devel
+# Install Java 21
+echo "Installing Java 21..."
+yum install -y java-21-openjdk java-21-openjdk-devel
 
 # Install PostgreSQL
 echo "Installing PostgreSQL..."

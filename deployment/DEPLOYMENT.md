@@ -19,7 +19,7 @@ sudo bash deployment/setup.sh
 
 # This installs:
 # - Node.js 24
-# - Java 17
+# - Java 21
 # - PostgreSQL 15
 # - HashiCorp Vault 1.16
 # - Creates log directory
@@ -34,10 +34,10 @@ curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
 sudo yum install -y nodejs
 ```
 
-### 2. Install Java 17
+### 2. Install Java 21
 
 ```bash
-sudo yum install -y java-17-openjdk java-17-openjdk-devel
+sudo yum install -y java-21-openjdk java-21-openjdk-devel
 ```
 
 ### 3. Install PostgreSQL

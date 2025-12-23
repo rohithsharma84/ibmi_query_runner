@@ -230,7 +230,7 @@ All backend and frontend components have been fully implemented and are ready fo
 - Spring Boot 3.2.1
 - JT400 21.0.6
 - HikariCP 7.0.2
-- Java 17+
+- Java 21+
 
 ---
 
@@ -260,7 +260,7 @@ All backend and frontend components have been fully implemented and are ready fo
 
 ### Prerequisites
 - [x] Node.js 24+ installed
-- [x] Java 17+ installed
+- [x] Java 21+ installed
 - [x] PostgreSQL 15+ installed
 - [x] HashiCorp Vault installed
 - [x] CentOS 10 (or compatible Linux)

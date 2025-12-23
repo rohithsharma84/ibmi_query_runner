@@ -178,8 +178,8 @@ The frontend layer needs to be built with React components:
 curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
 sudo yum install -y nodejs
 
-# Install Java 17
-sudo yum install -y java-17-openjdk-devel
+# Install Java 21
+sudo yum install -y java-21-openjdk-devel
 
 # Install PostgreSQL 15
 sudo yum install -y postgresql-server postgresql-contrib

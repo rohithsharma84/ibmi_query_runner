@@ -45,7 +45,7 @@ A comprehensive web-based application for testing, running, and comparing querie
 ### Development Environment
 - **OS**: CentOS 10 (Linux)
 - **Node.js**: v24.12.0 or higher
-- **Java**: Java 17 (OpenJDK or Oracle)
+- **Java**: Java 21 (OpenJDK or Oracle)
 - **PostgreSQL**: 15.x or higher
 - **HashiCorp Vault**: 1.16.x or higher
 - **Git**: For version control
@@ -69,8 +69,8 @@ sudo yum update -y
 curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
 sudo yum install -y nodejs
 
-# Install Java 17
-sudo yum install -y java-17-openjdk java-17-openjdk-devel
+# Install Java 21
+sudo yum install -y java-21-openjdk java-21-openjdk-devel
 
 # Install PostgreSQL
 sudo yum install -y postgresql-server postgresql-contrib
@@ -305,7 +305,7 @@ npm start
 - [ ] HashiCorp Vault running and configured
 - [ ] .env file created with all required values
 - [ ] Production SSL certificates obtained
-- [ ] Node.js and Java 17 installed
+- [ ] Node.js and Java 21 installed
 - [ ] Backend built: `npm run build`
 - [ ] Java service packaged: `mvn clean package`
 - [ ] App initialized: `npm run init`

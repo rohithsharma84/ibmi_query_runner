@@ -127,8 +127,8 @@ sudo systemctl enable query-runner-javaservice
 curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
 sudo dnf install -y nodejs
 
-# Install Java 17
-sudo dnf install -y java-17-openjdk java-17-openjdk-devel
+# Install Java 21
+sudo dnf install -y java-21-openjdk java-21-openjdk-devel
 
 # Install PostgreSQL 15
 sudo dnf install -y postgresql15-server postgresql15-contrib
